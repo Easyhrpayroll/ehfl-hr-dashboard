@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EHFL Workforce Dashboard — FY 2025-26</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f4f5f7; color: #1a1a2e; min-height: 100vh; }
+  .page { max-width: 1260px; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
+
+  /* ── HEADER ── */
+  .hdr { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 1.75rem; border-bottom: 2px solid #e0e4ef; padding-bottom: 1.25rem; }
+  .hdr-logo { display: flex; align-items: center; gap: 12px; }
+  .hdr-icon { width: 44px; height: 44px; border-radius: 10px; background: #1d4ed8; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff; font-weight: 700; flex-shrink: 0; }
+  .hdr-title { font-size: 20px; font-weight: 700; color: #0f172a; }
+  .hdr-sub { font-size: 13px; color: #64748b; margin-top: 2px; }
+  .hdr-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .badge { font-size: 11px; padding: 4px 12px; border-radius: 20px; font-weight: 600; background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+  .badge-warn { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+  .refresh-btn { font-size: 12px; padding: 7px 18px; border-radius: 20px; border: 1.5px solid #1d4ed8; background: #1d4ed8; color: #fff; cursor: pointer; font-weight: 600; transition: all .15s; display: flex; align-items: center; gap: 6px; }
+  .refresh-btn:hover { background: #1e40af; border-color: #1e40af; }
+  .refresh-btn:disabled { background: #94a3b8; border-color: #94a3b8; cursor: not-allowed; }
+  .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid #ffffff55; border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #last-updated { font-size: 11px; color: #94a3b8; }
+
+  /* ── LOADING / ERROR OVERLAY ── */
+  #overlay { position: fixed; inset: 0; background: rgba(244,245,247,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; gap: 16px; }
+  #overlay.hidden { display: none; }
+  .ov-spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: #1d4ed8; border-radius: 50%; animation: spin .8s linear infinite; }
+  .ov-text { font-size: 14px; color: #64748b; font-weight: 500; }
+  #error-box { background: #fee2e2; border: 1px solid #fca5a5; border-radius: 12px; padding: 1.25rem 1.5rem; max-width: 480px; text-align: center; display: none; }
+  #error-box h3 { color: #991b1b; font-size: 14px; margin-bottom: 8px; }
+  #error-box p { color: #7f1d1d; font-size: 12px; line-height: 1.6; }
+  #error-box button { margin-top: 12px; padding: 6px 16px; border-radius: 8px; border: none; background: #dc2626; color: #fff; font-size: 12px; cursor: pointer; font-weight: 600; }
+
+  /* ── KPI ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap: 12px; margin-bottom: 1.75rem; }
+  .kpi { background: #fff; border-radius: 12px; padding: 1rem 1.1rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .kpi-label { font-size: 11px; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+  .kpi-val { font-size: 26px; font-weight: 700; }
+  .kpi-sub { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+  .kv-blue{color:#1d4ed8} .kv-green{color:#16a34a} .kv-red{color:#dc2626} .kv-amber{color:#d97706} .kv-slate{color:#475569}
+
+  /* ── LAYOUT ── */
+  .section { margin-bottom: 2rem; }
+  .sec-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: .85rem; }
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .chart-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .chart-card.full { grid-column: 1 / -1; }
+  .chart-title { font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: .7rem; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; font-size: 11px; color: #64748b; }
+  .leg-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 3px; vertical-align: middle; }
+
+  /* ── BAR LIST ── */
+  .bar-list { display: flex; flex-direction: column; gap: 9px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+  .bar-label { width: 68px; color: #64748b; text-align: right; flex-shrink: 0; }
+  .bar-track { flex: 1; background: #f1f5f9; border-radius: 4px; height: 14px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; }
+  .bar-val { width: 34px; color: #1e293b; font-weight: 600; font-size: 11px; }
+
+  /* ── TABS ── */
+  .tab-wrap { display: flex; gap: 6px; margin-bottom: 1.1rem; flex-wrap: wrap; }
+  .tab-btn { font-size: 12px; padding: 6px 16px; border-radius: 20px; border: 1px solid #cbd5e1; background: #fff; color: #64748b; cursor: pointer; font-weight: 500; transition: all .15s; }
+  .tab-btn.active { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* ── ATTRITION TABLE ── */
+  .att-table-wrap { overflow-x: auto; }
+  .att-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 700px; }
+  .att-table thead tr { background: #f8fafc; }
+  .att-table th { padding: 9px 11px; text-align: right; font-weight: 600; font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1.5px solid #e2e8f0; white-space: nowrap; }
+  .att-table th:first-child { text-align: left; }
+  .att-table td { padding: 8px 11px; text-align: right; border-bottom: 1px solid #f1f5f9; color: #1e293b; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .att-table td:first-child { text-align: left; font-weight: 500; }
+  .att-table tr:hover:not(.total-row) td { background: #f8fafc; }
+  .att-table tr.total-row td { background: #f1f5f9; font-weight: 700; border-top: 1.5px solid #e2e8f0; border-bottom: none; }
+
+  /* ── MOM TABLE ── */
+  .mom-table-wrap { overflow-x: auto; }
+  .mom-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 650px; }
+  .mom-table thead tr { background: #f8fafc; }
+  .mom-table th { padding: 9px 11px; text-align: right; font-weight: 600; font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1.5px solid #e2e8f0; }
+  .mom-table th:first-child { text-align: left; }
+  .mom-table td { padding: 8px 11px; text-align: right; border-bottom: 1px solid #f1f5f9; color: #1e293b; font-variant-numeric: tabular-nums; }
+  .mom-table td:first-child { text-align: left; font-weight: 600; }
+  .mom-table tr:hover:not(.total-row) td { background: #f8fafc; }
+  .mom-table tr.total-row td { background: #f1f5f9; font-weight: 700; border-top: 1.5px solid #e2e8f0; border-bottom: none; }
+
+  /* ── PILLS ── */
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .pill-red   { background: #fee2e2; color: #991b1b; }
+  .pill-amber { background: #fef3c7; color: #92400e; }
+  .pill-green { background: #dcfce7; color: #166534; }
+  .pill-blue  { background: #dbeafe; color: #1e40af; }
+  .up { color: #16a34a; font-weight: 600; }
+  .dn { color: #dc2626; font-weight: 600; }
+
+  /* ── INLINE KPI IN SECTIONS ── */
+  .mini-kpi { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem 1.25rem; }
+  .mini-kpi .kpi-label { font-size: 11px; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+  .mini-kpi .kpi-val { font-size: 22px; font-weight: 700; }
+  .mini-kpi .kpi-sub { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+
+  .footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+  @media(max-width: 640px) { .chart-grid { grid-template-columns: 1fr; } .chart-card.full { grid-column: 1; } .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div id="overlay">
+  <div class="ov-spinner"></div>
+  <div class="ov-text" id="ov-msg">Connecting to Google Sheets...</div>
+  <div id="error-box">
+    <h3>Could not load data</h3>
+    <p id="error-detail">Please check the sheet is public ("Anyone with the link can view") and try again.</p>
+    <button onclick="document.getElementById('overlay').classList.add('hidden');document.getElementById('error-box').style.display='none'">Dismiss &amp; use cached data</button>
+  </div>
+</div>
+
+<div class="page">
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-logo">
+      <div class="hdr-icon">E</div>
+      <div>
+        <div class="hdr-title">EHFL Workforce Dashboard — FY 2025-26</div>
+        <div class="hdr-sub">Easy Home Finance &amp; Easy Digital &nbsp;·&nbsp; Apr 2025 – Mar 2026</div>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <span id="last-updated">Loading...</span>
+      <span class="badge" id="data-badge">Live</span>
+      <button class="refresh-btn" id="refresh-btn" onclick="loadData()">
+        <span id="refresh-icon">&#8635;</span> Refresh Data
+      </button>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid" id="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Opening headcount</div><div class="kpi-val kv-blue" id="kpi-opening">—</div><div class="kpi-sub">As of Apr 1, 2025</div></div>
+    <div class="kpi"><div class="kpi-label">Total joinings</div><div class="kpi-val kv-green" id="kpi-joinings">—</div><div class="kpi-sub">FY 25-26</div></div>
+    <div class="kpi"><div class="kpi-label">Total exits</div><div class="kpi-val kv-red" id="kpi-exits">—</div><div class="kpi-sub">FY 25-26</div></div>
+    <div class="kpi"><div class="kpi-label">Closing headcount</div><div class="kpi-val kv-blue" id="kpi-closing">—</div><div class="kpi-sub">Current</div></div>
+    <div class="kpi"><div class="kpi-label">Regret exits</div><div class="kpi-val kv-amber" id="kpi-regret">—</div><div class="kpi-sub" id="kpi-regret-pct"></div></div>
+    <div class="kpi"><div class="kpi-label">Non-regret exits</div><div class="kpi-val kv-slate" id="kpi-nonregret">—</div><div class="kpi-sub" id="kpi-nonregret-pct"></div></div>
+    <div class="kpi"><div class="kpi-label">&lt;90 day exits</div><div class="kpi-val kv-red" id="kpi-sub90">—</div><div class="kpi-sub">Early attrition</div></div>
+    <div class="kpi"><div class="kpi-label">Net headcount &Delta;</div><div class="kpi-val kv-green" id="kpi-net">—</div><div class="kpi-sub">Joinings – exits</div></div>
+  </div>
+
+  <!-- S1: MOM MOVEMENT -->
+  <div class="section">
+    <div class="sec-title">Month-on-month movement</div>
+    <div class="chart-card full" style="margin-bottom:1rem">
+      <div class="chart-title">Joinings vs exits — monthly trend</div>
+      <div class="legend">
+        <span><span class="leg-dot" style="background:#16a34a"></span>Joinings</span>
+        <span><span class="leg-dot" style="background:#dc2626"></span>Exits</span>
+        <span><span class="leg-dot" style="background:#d97706"></span>&lt;90 day exits</span>
+      </div>
+      <div style="position:relative;width:100%;height:280px"><canvas id="c1"></canvas></div>
+    </div>
+    <div class="chart-card full">
+      <div class="chart-title">Month-on-month headcount &amp; attrition detail</div>
+      <div class="mom-table-wrap">
+        <table class="mom-table">
+          <thead><tr>
+            <th>Month</th><th>Opening</th><th>Joining</th><th>Exit</th><th>Closing</th>
+            <th>Avg HC</th><th>Attrition %</th><th>&lt;90 Exits</th><th>&lt;90 Att %</th>
+          </tr></thead>
+          <tbody id="mom-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- S2: RESIGNATION TYPE -->
+  <div class="section">
+    <div class="sec-title">Resignation type</div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-title">Regret vs non-regret exits (monthly)</div>
+        <div class="legend">
+          <span><span class="leg-dot" style="background:#dc2626"></span>Regret</span>
+          <span><span class="leg-dot" style="background:#94a3b8"></span>Non-regret</span>
+        </div>
+        <div style="position:relative;width:100%;height:220px"><canvas id="c2"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Exit reasons breakdown</div>
+        <div style="position:relative;width:100%;height:220px"><canvas id="c3"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S3: DETAILED ATTRITION TABLES -->
+  <div class="section">
+    <div class="sec-title">Detailed attrition breakdown</div>
+    <div class="chart-card full">
+      <div class="tab-wrap">
+        <button class="tab-btn active" onclick="switchTab(event,'region')">Region-wise</button>
+        <button class="tab-btn" onclick="switchTab(event,'ho')">HO vs Non-HO</button>
+        <button class="tab-btn" onclick="switchTab(event,'type')">FOS / Non-Sales / Other</button>
+        <button class="tab-btn" onclick="switchTab(event,'dept')">Department-wise</button>
+      </div>
+      <div id="tab-region" class="tab-pane active">
+        <div class="chart-title" style="margin-bottom:.75rem">Region-wise attrition</div>
+        <div class="att-table-wrap"><table class="att-table" id="tbl-region"></table></div>
+      </div>
+      <div id="tab-ho" class="tab-pane">
+        <div class="chart-title" style="margin-bottom:.75rem">HO vs Non-HO attrition</div>
+        <div class="att-table-wrap"><table class="att-table" id="tbl-ho"></table></div>
+      </div>
+      <div id="tab-type" class="tab-pane">
+        <div class="chart-title" style="margin-bottom:.75rem">Employee type attrition (FOS / Non-Sales / Other)</div>
+        <div class="att-table-wrap"><table class="att-table" id="tbl-type"></table></div>
+      </div>
+      <div id="tab-dept" class="tab-pane">
+        <div class="chart-title" style="margin-bottom:.75rem">Department-wise attrition</div>
+        <div class="att-table-wrap"><table class="att-table" id="tbl-dept"></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S4: REGIONAL & TYPE CHARTS -->
+  <div class="section">
+    <div class="sec-title">Regional &amp; type charts</div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-title">Region-wise exits</div>
+        <div class="bar-list" id="regExits"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Region-wise joinings</div>
+        <div class="bar-list" id="regJoin"></div>
+      </div>
+    </div>
+    <div class="chart-grid" style="margin-top:1rem">
+      <div class="chart-card">
+        <div class="chart-title">Exits by employee type</div>
+        <div style="position:relative;width:100%;height:200px"><canvas id="c4"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Joinings by employee type</div>
+        <div style="position:relative;width:100%;height:200px"><canvas id="c5"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S5: EARLY ATTRITION -->
+  <div class="section">
+    <div class="sec-title">Early attrition (&lt;90 days)</div>
+    <div class="chart-card full">
+      <div class="chart-title">Sub-90 day exits — month-on-month</div>
+      <div style="position:relative;width:100%;height:200px"><canvas id="c6"></canvas></div>
+    </div>
+  </div>
+
+  <!-- S6: COMPANY & DEPT -->
+  <div class="section">
+    <div class="sec-title">Company &amp; department</div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-title">Exits by company</div>
+        <div style="position:relative;width:100%;height:180px"><canvas id="c7"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Exits by department (top 6)</div>
+        <div style="position:relative;width:100%;height:180px"><canvas id="c8"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S7: ABSCONDING -->
+  <div class="section">
+    <div class="sec-title">Absconding analysis</div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-title">Absconding count vs total exits — monthly</div>
+        <div class="legend">
+          <span><span class="leg-dot" style="background:#dc2626"></span>Total exits</span>
+          <span><span class="leg-dot" style="background:#7c3aed"></span>Absconding</span>
+        </div>
+        <div style="position:relative;width:100%;height:230px"><canvas id="c9"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Absconding as % of monthly exits</div>
+        <div style="position:relative;width:100%;height:230px"><canvas id="c10"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-grid" style="margin-top:1rem">
+      <div class="mini-kpi"><div class="kpi-label">Total absconding FY</div><div class="kpi-val kv-red" id="abs-total">—</div><div class="kpi-sub" id="abs-pct"></div></div>
+      <div class="mini-kpi"><div class="kpi-label">Peak absconding month</div><div class="kpi-val kv-amber" id="abs-peak">—</div><div class="kpi-sub" id="abs-peak-sub"></div></div>
+      <div class="mini-kpi"><div class="kpi-label">Lowest absconding month</div><div class="kpi-val kv-green" id="abs-low">—</div><div class="kpi-sub" id="abs-low-sub"></div></div>
+      <div class="mini-kpi"><div class="kpi-label">Monthly avg absconding</div><div class="kpi-val kv-slate" id="abs-avg">—</div><div class="kpi-sub">Per month, FY 25-26</div></div>
+    </div>
+  </div>
+
+  <!-- S8: TENURE BANDS -->
+  <div class="section">
+    <div class="sec-title">Tenure at exit — longevity analysis</div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-title">Exit distribution by tenure band</div>
+        <div style="position:relative;width:100%;height:240px"><canvas id="c11"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Tenure band exits — month-on-month (stacked)</div>
+        <div class="legend">
+          <span><span class="leg-dot" style="background:#dc2626"></span>0–3m</span>
+          <span><span class="leg-dot" style="background:#d97706"></span>3–6m</span>
+          <span><span class="leg-dot" style="background:#7c3aed"></span>6–12m</span>
+          <span><span class="leg-dot" style="background:#0891b2"></span>1–2yr</span>
+          <span><span class="leg-dot" style="background:#16a34a"></span>2yr+</span>
+        </div>
+        <div style="position:relative;width:100%;height:240px"><canvas id="c12"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-grid" style="margin-top:1rem">
+      <div class="mini-kpi"><div class="kpi-label">Avg tenure at exit</div><div class="kpi-val kv-amber" id="ten-avg">—</div><div class="kpi-sub" id="ten-avg-sub"></div></div>
+      <div class="mini-kpi"><div class="kpi-label">Exits within 6 months</div><div class="kpi-val kv-red" id="ten-6m">—</div><div class="kpi-sub" id="ten-6m-pct"></div></div>
+      <div class="mini-kpi"><div class="kpi-label">Exits within 3 months</div><div class="kpi-val kv-red" id="ten-3m">—</div><div class="kpi-sub" id="ten-3m-pct"></div></div>
+      <div class="mini-kpi"><div class="kpi-label">Exits after 1 year</div><div class="kpi-val kv-green" id="ten-1y">—</div><div class="kpi-sub" id="ten-1y-pct"></div></div>
+    </div>
+  </div>
+
+  <!-- S9: NET HIRE RATIO -->
+  <div class="section">
+    <div class="sec-title">Net hire ratio &amp; headcount projection</div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-title">Net hire ratio — monthly (joinings ÷ exits)</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:8px">Above 1.0 = growth &nbsp;|&nbsp; Below 1.0 = shrink</div>
+        <div style="position:relative;width:100%;height:230px"><canvas id="c13"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Headcount trajectory &amp; run-rate projection</div>
+        <div class="legend">
+          <span><span class="leg-dot" style="background:#1d4ed8"></span>Actual closing HC</span>
+          <span><span class="leg-dot" style="background:#94a3b8"></span>Projected</span>
+        </div>
+        <div style="position:relative;width:100%;height:230px"><canvas id="c14"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-grid" style="margin-top:1rem">
+      <div class="mini-kpi"><div class="kpi-label">FY avg net hire ratio</div><div class="kpi-val kv-green" id="nhr-avg">—</div><div class="kpi-sub">Joinings vs exits balance</div></div>
+      <div class="mini-kpi"><div class="kpi-label">Best growth month</div><div class="kpi-val kv-green" id="nhr-best">—</div><div class="kpi-sub" id="nhr-best-sub"></div></div>
+      <div class="mini-kpi"><div class="kpi-label">Shrink months</div><div class="kpi-val kv-red" id="nhr-shrink">—</div><div class="kpi-sub">Months where exits &gt; joinings</div></div>
+      <div class="mini-kpi"><div class="kpi-label">Projected HC — 3 months out</div><div class="kpi-val kv-blue" id="nhr-proj">—</div><div class="kpi-sub">Based on last 3-month run-rate</div></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Source: EHFL Super Employee Master (Google Sheets) &nbsp;·&nbsp; <span id="footer-updated">—</span></span>
+    <span>Generated by Claude &nbsp;·&nbsp; FY 2025-26</span>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════════════════════════ */
+const SHEET_ID = '1CrhK96ykb4etKSgc5EA-haxMDgs2q-ikyGhUfdeCfUE';
+const CSV_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&cachebust=${Date.now()}`;
+
+const FY_START = new Date('2025-04-01');
+const FY_END   = new Date('2026-03-31');
+const MONTHS_ORDER = ['2025-04','2025-05','2025-06','2025-07','2025-08','2025-09','2025-10','2025-11','2025-12','2026-01','2026-02','2026-03'];
+const MONTH_LABELS = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
+const REGIONS = ['RAJ','DNCR UP','GUJ','KRN','APTG','MMR','VID','WMH','MPCG','HO','TN'];
+const REGION_COLORS = ['#dc2626','#d97706','#7c3aed','#0891b2','#1d4ed8','#16a34a','#94a3b8','#db2777','#0d9488','#7c3aed','#b45309'];
+
+const G='#16a34a',R='#dc2626',A='#d97706',B='#1d4ed8',P='#7c3aed',T='#0891b2',S='#94a3b8';
+
+/* ═══════════════════════════════════════════════════════════════
+   CHART REGISTRY — destroy before redraw
+═══════════════════════════════════════════════════════════════ */
+const charts = {};
+function mkChart(id, config) {
+  if (charts[id]) { charts[id].destroy(); }
+  charts[id] = new Chart(document.getElementById(id), config);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════════ */
+function parseDate(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d) ? null : d;
+}
+function inFY(d) { return d && d >= FY_START && d <= FY_END; }
+function monthKey(d) { return d ? d.toISOString().slice(0,7) : null; }
+function r1(v) { return Math.round(v * 10) / 10; }
+function r0(v) { return Math.round(v); }
+
+function attPill(v) {
+  if (v >= 60)  return `<span class="pill pill-red">${v}%</span>`;
+  if (v >= 25)  return `<span class="pill pill-amber">${v}%</span>`;
+  if (v > 0)    return `<span class="pill pill-green">${v}%</span>`;
+  return `<span class="pill pill-blue">0%</span>`;
+}
+
+function baseOpts(extra={}) {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { font:{size:10}, autoSkip:false, maxRotation:45 }, grid: { display:false } },
+      y: { ticks: { font:{size:10} }, grid: { color:'rgba(100,116,139,0.12)' } },
+      ...( extra.scales || {} )
+    },
+    ...extra
+  };
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN COMPUTE + RENDER
+═══════════════════════════════════════════════════════════════ */
+function processData(rows) {
+
+  /* ── parse rows ── */
+  const opening = [], joinings = [], exits = [], sub90 = [];
+
+  rows.forEach(r => {
+    const doj = parseDate(r['Date_Of_Joining']);
+    const rel = parseDate(r['Relieving_Date']);
+    const isOpening  = (r['Joining'] || '').trim() === 'Opening';
+    const isJoining  = (r['Joining'] || '').trim() === 'Joining';
+    const isExit90   = (r['<90 Exits'] || '').trim() === 'Less than 90 D';
+
+    if (isOpening) opening.push(r);
+    if (isJoining && doj && inFY(doj)) joinings.push({...r, _doj: doj});
+    if (rel && inFY(rel)) {
+      exits.push({...r, _rel: rel, _doj: doj});
+      if (isExit90) sub90.push({...r, _rel: rel});
+    }
+  });
+
+  /* ── month-on-month ── */
+  function byMonth(arr, dateKey) {
+    const m = {};
+    MONTHS_ORDER.forEach(k => m[k] = []);
+    arr.forEach(r => {
+      const k = monthKey(r[dateKey]);
+      if (k && m[k] !== undefined) m[k].push(r);
+    });
+    return m;
+  }
+
+  const joinByMonth  = byMonth(joinings, '_doj');
+  const exitByMonth  = byMonth(exits,    '_rel');
+  const sub90ByMonth = byMonth(sub90,    '_rel');
+
+  const jCounts  = MONTHS_ORDER.map(k => joinByMonth[k].length);
+  const eCounts  = MONTHS_ORDER.map(k => exitByMonth[k].length);
+  const s90Counts= MONTHS_ORDER.map(k => sub90ByMonth[k].length);
+
+  /* ── compute MoM running HC ── */
+  const opHC = opening.length;
+  const momRows = [];
+  let runHC = opHC;
+  MONTHS_ORDER.forEach((k, i) => {
+    const j  = jCounts[i], e = eCounts[i], s = s90Counts[i];
+    const cl = runHC + j - e;
+    const avg = r1((runHC + cl) / 2);
+    const att = avg > 0 ? r1(e / avg * 100) : 0;
+    const s90att = e > 0 ? r1(s / e * 100) : 0;
+    momRows.push({ m: MONTH_LABELS[i], op: runHC, j, e, cl, avg, att, s90: s, s90att });
+    runHC = cl;
+  });
+
+  /* ── grand totals ── */
+  const totalJ   = joinings.length;
+  const totalE   = exits.length;
+  const totalS90 = sub90.length;
+  const closing  = opHC + totalJ - totalE;
+  const avgHC    = r1((opHC + closing) / 2);
+  const attYTD   = avgHC > 0 ? r1(totalE / avgHC * 100) : 0;
+  const s90att   = totalE > 0 ? r1(totalS90 / totalE * 100) : 0;
+
+  const regret    = exits.filter(r => (r['type']||'').trim() === 'Regret').length;
+  const nonRegret = exits.filter(r => (r['type']||'').trim() === 'Non Regret').length;
+
+  /* ── update KPI cards ── */
+  setText('kpi-opening',   opHC.toLocaleString());
+  setText('kpi-joinings',  totalJ.toLocaleString());
+  setText('kpi-exits',     totalE.toLocaleString());
+  setText('kpi-closing',   closing.toLocaleString());
+  setText('kpi-regret',    regret.toLocaleString());
+  setText('kpi-regret-pct', `${r1(regret/totalE*100)}% of exits`);
+  setText('kpi-nonregret', nonRegret.toLocaleString());
+  setText('kpi-nonregret-pct', `${r1(nonRegret/totalE*100)}% of exits`);
+  setText('kpi-sub90',     totalS90.toLocaleString());
+  const net = totalJ - totalE;
+  setText('kpi-net',       (net >= 0 ? '+' : '') + net.toLocaleString());
+
+  /* ── MoM table ── */
+  (function() {
+    let h = '';
+    momRows.forEach((d, i) => {
+      const prev  = i > 0 ? momRows[i-1] : null;
+      const delta = prev ? d.cl - prev.cl : null;
+      const dh    = delta !== null ? ` <span style="font-size:10px;color:${delta>=0?'#16a34a':'#dc2626'}">${delta>=0?'+':''}${delta}</span>` : '';
+      const ap    = d.att >= 7 ? 'pill-red' : d.att >= 6 ? 'pill-amber' : 'pill-green';
+      const sp    = d.s90att >= 40 ? 'pill-red' : d.s90att >= 25 ? 'pill-amber' : 'pill-green';
+      h += `<tr><td>${d.m}</td><td>${d.op.toLocaleString()}</td><td class="up">+${d.j}</td><td class="dn">-${d.e}</td><td>${d.cl.toLocaleString()}${dh}</td><td>${d.avg}</td><td><span class="pill ${ap}">${d.att}%</span></td><td>${d.s90}</td><td><span class="pill ${sp}">${d.s90att}%</span></td></tr>`;
+    });
+    h += `<tr class="total-row"><td>FY Total</td><td>${opHC}</td><td class="up">+${totalJ}</td><td class="dn">-${totalE}</td><td>${closing}</td><td>${avgHC}</td><td>${attPill(attYTD)}</td><td>${totalS90}</td><td>${attPill(s90att)}</td></tr>`;
+    document.getElementById('mom-tbody').innerHTML = h;
+  })();
+
+  /* ── C1: Trend chart ── */
+  mkChart('c1', { type:'bar', data:{ labels:MONTH_LABELS, datasets:[
+    { label:'Joinings', data:jCounts,  backgroundColor:G+'99', borderColor:G, borderWidth:1.5, borderRadius:3 },
+    { label:'Exits',    data:eCounts,  backgroundColor:R+'99', borderColor:R, borderWidth:1.5, borderRadius:3 },
+    { label:'<90d',     data:s90Counts,backgroundColor:A+'bb', borderColor:A, borderWidth:1.5, borderRadius:3 }
+  ]}, options: baseOpts() });
+
+  /* ── C2: Regret stacked ── */
+  const regretByMonth  = MONTHS_ORDER.map(k => exitByMonth[k].filter(r=>(r['type']||'').trim()==='Regret').length);
+  const nonRegByMonth  = MONTHS_ORDER.map(k => exitByMonth[k].filter(r=>(r['type']||'').trim()==='Non Regret').length);
+  mkChart('c2', { type:'bar', data:{ labels:MONTH_LABELS, datasets:[
+    { label:'Regret',     data:regretByMonth, backgroundColor:R+'cc', borderRadius:2 },
+    { label:'Non-regret', data:nonRegByMonth, backgroundColor:S+'bb', borderRadius:2 }
+  ]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+    scales:{ x:{stacked:true,ticks:{font:{size:9},autoSkip:false,maxRotation:45},grid:{display:false}},
+             y:{stacked:true,ticks:{font:{size:9}},grid:{color:'rgba(100,116,139,0.12)'}} }}});
+
+  /* ── C3: Exit reasons doughnut ── */
+  const reasonMap = {};
+  exits.forEach(r => {
+    const reason = (r['Reason for Exit']||'Other').trim() || 'Other';
+    reasonMap[reason] = (reasonMap[reason]||0) + 1;
+  });
+  const reasonLabels = Object.keys(reasonMap).sort((a,b)=>reasonMap[b]-reasonMap[a]);
+  const reasonData   = reasonLabels.map(k=>reasonMap[k]);
+  const rColors = [R,A,P,T,S,B,'#db2777','#0d9488'];
+  mkChart('c3', { type:'doughnut', data:{ labels:reasonLabels, datasets:[{data:reasonData,backgroundColor:rColors.slice(0,reasonLabels.length),borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'right',labels:{font:{size:10},boxWidth:10}}}}});
+
+  /* ── Attrition table builder ── */
+  function groupTable(groupFn, groups) {
+    return groups.map(g => {
+      const op = opening.filter(r => groupFn(r) === g).length;
+      const j  = joinings.filter(r => groupFn(r) === g).length;
+      const e  = exits.filter(r => groupFn(r) === g).length;
+      const s  = sub90.filter(r => groupFn(r) === g).length;
+      const cl = op + j - e;
+      const avg = r1((op + cl) / 2);
+      const att = avg > 0 ? r1(e / avg * 100) : 0;
+      const s90att = e > 0 ? r1(s / e * 100) : 0;
+      return { g, op, j, e, cl, avg, att, s90: s, s90att };
+    });
+  }
+
+  const TH = `<thead><tr><th>Group</th><th>Opening</th><th>Joining</th><th>Exit</th><th>Closing</th><th>Avg HC</th><th>YTD Att%</th><th>&lt;90 Exits</th><th>&lt;90 Att%</th></tr></thead>`;
+
+  function buildTable(id, rows) {
+    const totOp=rows.reduce((s,d)=>s+d.op,0), totJ=rows.reduce((s,d)=>s+d.j,0), totE=rows.reduce((s,d)=>s+d.e,0), totS=rows.reduce((s,d)=>s+d.s90,0);
+    const totCl=totOp+totJ-totE, totAvg=r1((totOp+totCl)/2);
+    const totAtt=totAvg>0?r1(totE/totAvg*100):0, totS90att=totE>0?r1(totS/totE*100):0;
+    let h = TH + '<tbody>';
+    rows.forEach(d => {
+      h += `<tr><td>${d.g}</td><td>${d.op}</td><td class="up">+${d.j}</td><td class="dn">-${d.e}</td><td>${d.cl}</td><td>${d.avg}</td><td>${attPill(d.att)}</td><td>${d.s90||'—'}</td><td>${d.s90att>0?attPill(d.s90att):'—'}</td></tr>`;
+    });
+    h += `<tr class="total-row"><td>Total</td><td>${totOp}</td><td class="up">+${totJ}</td><td class="dn">-${totE}</td><td>${totCl}</td><td>${totAvg}</td><td>${attPill(totAtt)}</td><td>${totS}</td><td>${attPill(totS90att)}</td></tr></tbody>`;
+    document.getElementById(id).innerHTML = h;
+  }
+
+  const regionRows = groupTable(r => (r['Region']||'').trim(), REGIONS);
+  const hoRows     = groupTable(r => (r['HO']||'').trim(), ['HO','Non HO']);
+  const typeRows   = groupTable(r => (r['HO/Non']||'').trim(), ['FOS','Non Sales','Other']);
+  const depts      = [...new Set([...opening,...joinings,...exits].map(r=>(r['Department']||'').trim()).filter(Boolean))].sort();
+  const deptRows   = groupTable(r => (r['Department']||'').trim(), depts);
+
+  buildTable('tbl-region', regionRows);
+  buildTable('tbl-ho',     hoRows);
+  buildTable('tbl-type',   typeRows);
+  buildTable('tbl-dept',   deptRows);
+
+  /* ── Region bar charts ── */
+  const rExits = REGIONS.map(rg => exits.filter(r=>(r['Region']||'').trim()===rg).length);
+  const rJoin  = REGIONS.map(rg => joinings.filter(r=>(r['Region']||'').trim()===rg).length);
+  const mxE = Math.max(...rExits), mxJ = Math.max(...rJoin);
+  function renderBars(id, data, mx) {
+    document.getElementById(id).innerHTML = REGIONS.map((rg,i) => `
+      <div class="bar-row"><span class="bar-label">${rg}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${mx?Math.round(data[i]/mx*100):0}%;background:${REGION_COLORS[i]}"></div></div>
+      <span class="bar-val">${data[i]}</span></div>`).join('');
+  }
+  renderBars('regExits', rExits, mxE);
+  renderBars('regJoin',  rJoin,  mxJ);
+
+  /* ── C4, C5: Type pies ── */
+  const typeLabels = ['FOS','Non Sales','Other'];
+  const typeExits  = typeLabels.map(t => exits.filter(r=>(r['HO/Non']||'').trim()===t).length);
+  const typeJoins  = typeLabels.map(t => joinings.filter(r=>(r['HO/Non']||'').trim()===t).length);
+  mkChart('c4',{type:'pie',data:{labels:typeLabels,datasets:[{data:typeExits,backgroundColor:[R,A,P],borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'right',labels:{font:{size:10},boxWidth:10}}}}});
+  mkChart('c5',{type:'pie',data:{labels:typeLabels,datasets:[{data:typeJoins,backgroundColor:[G,T,B],borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'right',labels:{font:{size:10},boxWidth:10}}}}});
+
+  /* ── C6: Sub-90 line ── */
+  mkChart('c6',{type:'line',data:{labels:MONTH_LABELS,datasets:[{label:'<90d',data:s90Counts,borderColor:A,backgroundColor:A+'33',fill:true,tension:.35,pointRadius:5,pointBackgroundColor:A}]},options:baseOpts()});
+
+  /* ── C7: Company bar ── */
+  const companies = [...new Set(exits.map(r=>(r['Company']||'').trim()).filter(Boolean))];
+  const compCounts = companies.map(c=>exits.filter(r=>(r['Company']||'').trim()===c).length);
+  mkChart('c7',{type:'bar',data:{labels:companies,datasets:[{data:compCounts,backgroundColor:[B,P,'#0d9488'],borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},grid:{color:'rgba(100,116,139,0.12)'}}}}});
+
+  /* ── C8: Dept top 6 ── */
+  const deptExits = depts.map(d=>exits.filter(r=>(r['Department']||'').trim()===d).length);
+  const deptSorted = depts.map((d,i)=>({d,n:deptExits[i]})).sort((a,b)=>b.n-a.n).slice(0,6);
+  mkChart('c8',{type:'bar',data:{labels:deptSorted.map(x=>x.d),datasets:[{data:deptSorted.map(x=>x.n),backgroundColor:[R,A,P,T,B,G],borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}},grid:{color:'rgba(100,116,139,0.12)'}},y:{ticks:{font:{size:10}},grid:{display:false}}}}});
+
+  /* ── ABSCONDING ── */
+  const abscByMonth = MONTHS_ORDER.map(k => exitByMonth[k].filter(r=>(r['Reason for Exit']||'').trim()==='Absconding').length);
+  const abscPct     = MONTHS_ORDER.map((k,i) => eCounts[i]>0 ? r1(abscByMonth[i]/eCounts[i]*100) : 0);
+  const totalAbsc   = abscByMonth.reduce((s,v)=>s+v,0);
+  const peakIdx     = abscPct.indexOf(Math.max(...abscPct));
+  const lowIdx      = abscPct.indexOf(Math.min(...abscPct.filter(v=>v>0)));
+
+  setText('abs-total', totalAbsc);
+  setText('abs-pct',   `${r1(totalAbsc/totalE*100)}% of all exits`);
+  setText('abs-peak',  MONTH_LABELS[peakIdx]);
+  setText('abs-peak-sub', `${abscByMonth[peakIdx]} cases — ${abscPct[peakIdx]}% of ${MONTH_LABELS[peakIdx]} exits`);
+  setText('abs-low',   MONTH_LABELS[lowIdx]);
+  setText('abs-low-sub', `${abscByMonth[lowIdx]} cases — ${abscPct[lowIdx]}% of ${MONTH_LABELS[lowIdx]} exits`);
+  setText('abs-avg',   r1(totalAbsc / MONTHS_ORDER.length));
+
+  mkChart('c9',{type:'bar',data:{labels:MONTH_LABELS,datasets:[
+    {label:'Total exits', data:eCounts,     backgroundColor:R+'55',borderColor:R,borderWidth:1.5,borderRadius:3},
+    {label:'Absconding',  data:abscByMonth, backgroundColor:P+'cc',borderColor:P,borderWidth:1.5,borderRadius:3}
+  ]},options:baseOpts()});
+  mkChart('c10',{type:'line',data:{labels:MONTH_LABELS,datasets:[{label:'Absconding %',data:abscPct,borderColor:P,backgroundColor:P+'22',fill:true,tension:.35,pointRadius:5,pointBackgroundColor:P}]},
+    options:{...baseOpts(),scales:{x:{ticks:{font:{size:10},autoSkip:false,maxRotation:45},grid:{display:false}},y:{ticks:{font:{size:10},callback:v=>v+'%'},grid:{color:'rgba(100,116,139,0.12)'},min:0}}}});
+
+  /* ── TENURE BANDS ── */
+  function tenureBand(days) {
+    if (days === null || isNaN(days)) return 'Unknown';
+    if (days <= 90)  return '0–3 months';
+    if (days <= 180) return '3–6 months';
+    if (days <= 365) return '6–12 months';
+    if (days <= 730) return '1–2 years';
+    return '2+ years';
+  }
+  const bandOrder = ['0–3 months','3–6 months','6–12 months','1–2 years','2+ years'];
+  const bandColors = [R,A,P,T,G];
+  const bandCounts = bandOrder.map(b => exits.filter(r => tenureBand(r._doj && r._rel ? (r._rel - r._doj)/86400000 : null) === b).length);
+
+  const tenureDays = exits.map(r => r._doj && r._rel ? (r._rel - r._doj)/86400000 : null).filter(v=>v!==null);
+  const avgTenureDays = r0(tenureDays.reduce((s,v)=>s+v,0) / tenureDays.length);
+  const avgTenureMo   = r1(avgTenureDays / 30);
+  const exit3m  = exits.filter(r => { const d = r._doj && r._rel ? (r._rel-r._doj)/86400000 : null; return d !== null && d <= 90; }).length;
+  const exit6m  = exits.filter(r => { const d = r._doj && r._rel ? (r._rel-r._doj)/86400000 : null; return d !== null && d <= 180; }).length;
+  const exit1yp = exits.filter(r => { const d = r._doj && r._rel ? (r._rel-r._doj)/86400000 : null; return d !== null && d > 365; }).length;
+
+  setText('ten-avg',     `${avgTenureMo} mo`);
+  setText('ten-avg-sub', `${avgTenureDays} days average`);
+  setText('ten-3m',      exit3m);
+  setText('ten-3m-pct',  `${r1(exit3m/totalE*100)}% of all exits`);
+  setText('ten-6m',      exit6m);
+  setText('ten-6m-pct',  `${r1(exit6m/totalE*100)}% of all exits`);
+  setText('ten-1y',      exit1yp);
+  setText('ten-1y-pct',  `${r1(exit1yp/totalE*100)}% — experienced attrition`);
+
+  mkChart('c11',{type:'doughnut',data:{labels:bandOrder,datasets:[{data:bandCounts,backgroundColor:bandColors,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'right',labels:{font:{size:10},boxWidth:10}}}}});
+
+  const bandMoM = bandOrder.map(b =>
+    MONTHS_ORDER.map(k => exitByMonth[k].filter(r => {
+      const d = r._doj && r._rel ? (r._rel - r._doj)/86400000 : null;
+      return tenureBand(d) === b;
+    }).length)
+  );
+  mkChart('c12',{type:'bar',data:{labels:MONTH_LABELS,datasets:bandOrder.map((b,i)=>({label:b,data:bandMoM[i],backgroundColor:bandColors[i]+'cc',borderRadius:2}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{stacked:true,ticks:{font:{size:9},autoSkip:false,maxRotation:45},grid:{display:false}},y:{stacked:true,ticks:{font:{size:9}},grid:{color:'rgba(100,116,139,0.12)'}}}}});
+
+  /* ── NET HIRE RATIO ── */
+  const nhr = MONTHS_ORDER.map((k,i) => eCounts[i]>0 ? r1(jCounts[i]/eCounts[i]) : 0);
+  const avgNHR = r1(nhr.filter(v=>v>0).reduce((s,v)=>s+v,0) / nhr.filter(v=>v>0).length);
+  const bestIdx = nhr.indexOf(Math.max(...nhr));
+  const shrinkMonths = nhr.filter(v=>v>0&&v<1).length;
+
+  const last3J = jCounts.slice(-3).reduce((s,v)=>s+v,0)/3;
+  const last3E = eCounts.slice(-3).reduce((s,v)=>s+v,0)/3;
+  const lastCl = momRows[momRows.length-1].cl;
+  const proj3  = r0(lastCl + (last3J - last3E) * 3);
+
+  setText('nhr-avg',      avgNHR);
+  setText('nhr-best',     MONTH_LABELS[bestIdx]);
+  setText('nhr-best-sub', `Ratio ${nhr[bestIdx]} — ${jCounts[bestIdx]} joins, ${eCounts[bestIdx]} exits`);
+  setText('nhr-shrink',   shrinkMonths);
+  setText('nhr-proj',     proj3.toLocaleString());
+
+  mkChart('c13',{type:'bar',data:{labels:MONTH_LABELS,datasets:[{label:'Net hire ratio',data:nhr,
+    backgroundColor:nhr.map(v=>v>=1?G+'99':R+'99'),borderColor:nhr.map(v=>v>=1?G:R),borderWidth:1.5,borderRadius:3}]},
+    options:{...baseOpts(),scales:{x:{ticks:{font:{size:10},autoSkip:false,maxRotation:45},grid:{display:false}},y:{ticks:{font:{size:10}},grid:{color:'rgba(100,116,139,0.12)'},min:0,max:Math.max(3,...nhr)+0.3}}}});
+
+  const clHC = momRows.map(d=>d.cl);
+  const allLabels = [...MONTH_LABELS, "Apr'26","May'26","Jun'26"];
+  const actFull   = [...clHC, null, null, null];
+  const projFull  = [...Array(MONTH_LABELS.length-1).fill(null), lastCl, r0(lastCl+(last3J-last3E)), r0(lastCl+(last3J-last3E)*2), proj3];
+  mkChart('c14',{type:'line',data:{labels:allLabels,datasets:[
+    {label:'Actual',  data:actFull, borderColor:B,backgroundColor:B+'22',fill:true,tension:.35,pointRadius:4,pointBackgroundColor:B,spanGaps:false},
+    {label:'Projected',data:projFull,borderColor:S,backgroundColor:S+'22',fill:true,tension:.35,pointRadius:4,pointBackgroundColor:S,borderDash:[5,4],spanGaps:false}
+  ]},options:{...baseOpts(),scales:{x:{ticks:{font:{size:10},autoSkip:false,maxRotation:45},grid:{display:false}},y:{ticks:{font:{size:10}},grid:{color:'rgba(100,116,139,0.12)'},min:Math.min(...clHC)-100}}}});
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LOAD DATA FROM GOOGLE SHEETS — via JSON API (CORS-safe)
+═══════════════════════════════════════════════════════════════ */
+function setLoading(on, msg='Loading data...') {
+  const ov  = document.getElementById('overlay');
+  const btn = document.getElementById('refresh-btn');
+  const ico = document.getElementById('refresh-icon');
+  if (on) {
+    ov.classList.remove('hidden');
+    document.getElementById('ov-msg').textContent = msg;
+    document.getElementById('error-box').style.display = 'none';
+    btn.disabled = true;
+    if (ico) ico.outerHTML = '<span class="spin" id="refresh-icon"></span>';
+  } else {
+    ov.classList.add('hidden');
+    btn.disabled = false;
+    const ico2 = document.getElementById('refresh-icon');
+    if (ico2) ico2.outerHTML = '<span id="refresh-icon">&#8635;</span>';
+  }
+}
+
+function showError(msg) {
+  document.getElementById('ov-msg').textContent = 'Failed to load';
+  const eb = document.getElementById('error-box');
+  document.getElementById('error-detail').textContent = msg;
+  eb.style.display = 'block';
+  document.getElementById('refresh-btn').disabled = false;
+  const ico = document.getElementById('refresh-icon');
+  if (ico) ico.outerHTML = '<span id="refresh-icon">&#8635;</span>';
+}
+
+/* Parse Google Sheets JSON feed into array-of-objects (like CSV rows) */
+function parseGSheetJSON(json) {
+  const feed  = json.feed;
+  const cols  = feed.entry ? [] : [];
+  /* extract headers from first row via gs$cell */
+  const cells = json.feed.entry || [];
+  const headerMap = {};
+  const rows = {};
+  let maxRow = 0;
+
+  cells.forEach(cell => {
+    const rc  = cell.gs$cell;
+    const row = parseInt(rc.row);
+    const col = parseInt(rc.col);
+    const val = rc.$t;
+    if (row === 1) { headerMap[col] = val; return; }
+    if (!rows[row]) rows[row] = {};
+    rows[row][col] = val;
+    if (row > maxRow) maxRow = row;
+  });
+
+  const result = [];
+  for (let r = 2; r <= maxRow; r++) {
+    if (!rows[r]) continue;
+    const obj = {};
+    Object.keys(headerMap).forEach(col => {
+      obj[headerMap[col]] = rows[r][col] || '';
+    });
+    result.push(obj);
+  }
+  return result;
+}
+
+function loadData() {
+  setLoading(true, 'Connecting to Google Sheets...');
+
+  /* Google Sheets Cells JSON Feed — works cross-origin for public sheets */
+  const jsonUrl = `https://spreadsheets.google.com/feeds/cells/${SHEET_ID}/1/public/full?alt=json&t=${Date.now()}`;
+
+  const script = document.createElement('script');
+  window._gsCallback = function(json) {
+    document.head.removeChild(script);
+    delete window._gsCallback;
+    try {
+      document.getElementById('ov-msg').textContent = 'Parsing rows...';
+      const rows = parseGSheetJSON(json);
+      if (!rows.length) {
+        showError('No data found. Make sure the sheet has data and sharing is "Anyone with the link → Viewer".');
+        return;
+      }
+      document.getElementById('ov-msg').textContent = `Processing ${rows.length.toLocaleString()} rows...`;
+      setTimeout(() => {
+        try {
+          processData(rows);
+          const now = new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+          setText('last-updated', `Updated ${now}`);
+          setText('footer-updated', `Refreshed ${now}`);
+          const badge = document.getElementById('data-badge');
+          badge.textContent = `${rows.length.toLocaleString()} rows live`;
+          badge.className = 'badge';
+          setLoading(false);
+        } catch(e) {
+          showError(`Processing error: ${e.message}. Check column names match: Date_Of_Joining, Relieving_Date, Region, HO, HO/Non, Joining, Reason for Exit, type, <90 Exits, Department, Company.`);
+          console.error(e);
+        }
+      }, 80);
+    } catch(e) {
+      showError(`Parse error: ${e.message}`);
+      console.error(e);
+    }
+  };
+
+  script.onerror = function() {
+    document.head.removeChild(script);
+    delete window._gsCallback;
+    /* Fallback: try fetch with no-cors workaround via gviz query */
+    loadDataViaGViz();
+  };
+
+  script.src = jsonUrl + '&callback=_gsCallback';
+  document.head.appendChild(script);
+}
+
+/* ── FALLBACK: Google Visualization Query API (also CORS-safe) ── */
+function loadDataViaGViz() {
+  setLoading(true, 'Trying alternate method...');
+  const cb = '_gvizCb' + Date.now();
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}&sheet=Sheet1&t=${Date.now()}`;
+
+  const script = document.createElement('script');
+  window[cb] = function(data) {
+    document.head.removeChild(script);
+    delete window[cb];
+    try {
+      const cols = data.table.cols.map(c => c.label);
+      const rows = data.table.rows.map(row => {
+        const obj = {};
+        row.c.forEach((cell, i) => {
+          let val = '';
+          if (cell && cell.v !== null && cell.v !== undefined) {
+            /* Google returns dates as Date(year,month,day) strings */
+            if (typeof cell.v === 'string' && cell.v.startsWith('Date(')) {
+              const parts = cell.v.slice(5,-1).split(',').map(Number);
+              val = new Date(parts[0], parts[1], parts[2]).toISOString().slice(0,10);
+            } else {
+              val = String(cell.v);
+            }
+          }
+          obj[cols[i]] = val;
+        });
+        return obj;
+      });
+
+      if (!rows.length) {
+        showError('Sheet appears empty. Check the sheet name is "Sheet1" or update accordingly, and sharing is public.');
+        return;
+      }
+
+      document.getElementById('ov-msg').textContent = `Processing ${rows.length.toLocaleString()} rows...`;
+      setTimeout(() => {
+        try {
+          processData(rows);
+          const now = new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+          setText('last-updated', `Updated ${now}`);
+          setText('footer-updated', `Refreshed ${now}`);
+          const badge = document.getElementById('data-badge');
+          badge.textContent = `${rows.length.toLocaleString()} rows live`;
+          badge.className = 'badge';
+          setLoading(false);
+        } catch(e) {
+          showError(`Processing error: ${e.message}`);
+          console.error(e);
+        }
+      }, 80);
+    } catch(e) {
+      showError(`Could not parse sheet data: ${e.message}. Ensure the sheet is public and has the correct column headers.`);
+      console.error(e);
+    }
+  };
+
+  script.onerror = function() {
+    document.head.removeChild(script);
+    delete window[cb];
+    showError('Both fetch methods failed. Please confirm: (1) Sheet is shared as "Anyone with the link → Viewer", (2) The sheet tab is named "Sheet1".');
+  };
+
+  script.src = url;
+  document.head.appendChild(script);
+}
+
+/* ── TAB SWITCH ── */
+function switchTab(e, id) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  e.target.classList.add('active');
+}
+
+/* ── AUTO-LOAD ON OPEN ── */
+window.addEventListener('load', loadData);
+</script>
+</body>
+</html>
