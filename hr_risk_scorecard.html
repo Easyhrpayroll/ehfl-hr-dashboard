@@ -289,7 +289,7 @@ function buildEmps(rows, startYr) {
     const zone   = (iZone>=0?(row[iZone]||'').trim():'')||'';
     return {
       isOpening: joining==='opening', isJoining: joining==='joining', isExit,
-      exitMoIdx, tenureDays, doj,
+      exitMoIdx, tenureDays, doj, reliev,
       region, zone, hoNon, isFOS,
       sub90:(()=>{ const v=(row[i90]||'').trim().toLowerCase(); return v.includes('less')&&v.includes('90'); })(),
       reason:(row[iReason]||'').trim(),
@@ -359,10 +359,15 @@ function getMoIdxLocal(e,startYr,kind){ return e.doj?getMoIdx(e.doj,startYr):-1;
 
 /* ═══════════════════════ ACTIVE TENURE ═══════════════════════ */
 function activeTenure(all, startYr) {
-  // Active = not exited; include Opening + Joining rows that have a DOJ
-  const emps = filterEmps(all).filter(e=>!e.isExit && e.doj);
+  // As-on-date basis: as-of = today while the FY is still running, else the FY close date.
   const fyClose=new Date(startYr+1,2,31), today=new Date();
   const asOf = today<fyClose ? today : fyClose;
+  // On-roll as of `asOf` = joined on/before as-of date AND
+  // either never marked exit, or relieved AFTER the as-of date (still on rolls then).
+  const scoped = filterEmps(all);
+  const emps = scoped.filter(e=> e.doj && e.doj<=asOf && (!e.isExit || (e.reliev && e.reliev>asOf)) );
+  // Diagnostic: on-roll rows that can't be placed because they lack a joining date.
+  const noDoj = scoped.filter(e=> !e.doj && (!e.isExit || (e.reliev && e.reliev>asOf))).length;
   const bandIdx=d=>{ if(d<180)return 0; if(d<365)return 1; if(d<730)return 2; if(d<1095)return 3; return 4; };
   const rows=TEN_BANDS.map(()=>({total:0,fos:0,non:0}));
   emps.forEach(e=>{
@@ -371,14 +376,17 @@ function activeTenure(all, startYr) {
     if(e.isFOS) rows[bi].fos++; else rows[bi].non++;
   });
   const total=rows.reduce((s,r)=>s+r.total,0);
-  return { rows, total, asOf,
+  return { rows, total, asOf, noDoj,
     fosTotal:rows.reduce((s,r)=>s+r.fos,0),
     nonTotal:rows.reduce((s,r)=>s+r.non,0) };
 }
 
 /* ═══════════════════════ FOS EXIT ═══════════════════════ */
 function fosExitAnalysis(all, startYr) {
-  const fosExits = filterEmps(all).filter(e=>e.isExit && e.isFOS);
+  // As-on-date basis: count exits that have actually happened on/before the as-of date.
+  const fyClose=new Date(startYr+1,2,31), today=new Date();
+  const asOf = today<fyClose ? today : fyClose;
+  const fosExits = filterEmps(all).filter(e=>e.isExit && e.isFOS && (!e.reliev || e.reliev<=asOf));
   const total=fosExits.length;
   const regret=fosExits.filter(e=>e.isRegret);
   const nonReg=fosExits.filter(e=>e.isNonRegret);
@@ -469,12 +477,21 @@ function renderTenure() {
       scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},y:{stacked:true,grid:{color:'rgba(100,116,139,.1)'},ticks:{font:{size:10}}}}
     }
   });
+  const asOfStr=t.asOf.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  if(t.total===0){
+    document.getElementById('tenure-note').innerHTML = t.noDoj
+      ? `No tenure could be calculated as of ${asOfStr}: <b>${t.noDoj}</b> on-roll ${tenureFY==='27'?'FY27':'FY26'} row(s) are missing a <code>date_of_joining</code>. `+
+        `Add joining dates to those rows (e.g. the FY27 carry-forward / Opening rows) and this view will populate on an as-on-date basis. Scope: <b>${scopeLabel()}</b>.`
+      : `No active employees with a joining date found in the FY${tenureFY} tab as of ${asOfStr}. Scope: <b>${scopeLabel()}</b>.`;
+    return;
+  }
   const newBlood=t.rows[0].total+t.rows[1].total, newPct=t.total?Math.round(newBlood/t.total*100):0;
   const core=t.rows[3].total+t.rows[4].total, corePct=t.total?Math.round(core/t.total*100):0;
   document.getElementById('tenure-note').innerHTML =
-    `<b>${t.total.toLocaleString()}</b> active employees as of ${t.asOf.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} `+
-    `(${tenureFY==='27'?'FY27 current':'FY26 close'}). <b>${newPct}%</b> have &lt;1 year tenure (ramp/stability risk), <b>${corePct}%</b> are 2yr+ tenured core. `+
-    `FOS share of active workforce: ${t.total?Math.round(t.fosTotal/t.total*100):0}%. Scope: <b>${scopeLabel()}</b>.`;
+    `<b>${t.total.toLocaleString()}</b> active employees as of ${asOfStr} `+
+    `(${tenureFY==='27'?'FY27 as-on-date':'FY26 close'}). <b>${newPct}%</b> have &lt;1 year tenure (ramp/stability risk), <b>${corePct}%</b> are 2yr+ tenured core. `+
+    `FOS share of active workforce: ${t.total?Math.round(t.fosTotal/t.total*100):0}%.`+
+    `${t.noDoj?` <span style="color:${A}">(${t.noDoj} on-roll row(s) excluded — missing date_of_joining.)</span>`:''} Scope: <b>${scopeLabel()}</b>.`;
 }
 
 /* ═══════════════════════ FOS EXIT RENDER ═══════════════════════ */
