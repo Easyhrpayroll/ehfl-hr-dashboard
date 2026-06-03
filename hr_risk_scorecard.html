@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EHFL HR Risk Scorecard — FY26 vs FY27</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:#f4f5f7; color:#1a1a2e; }
+  .page { max-width:1280px; margin:0 auto; padding:2rem 1.5rem 3rem; }
+
+  /* HEADER */
+  .hdr { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:1.5rem; border-bottom:2px solid #e0e4ef; padding-bottom:1.25rem; }
+  .hdr-left { display:flex; align-items:center; gap:12px; }
+  .hdr-icon { width:44px; height:44px; border-radius:10px; background:#0f766e; display:flex; align-items:center; justify-content:center; font-size:20px; color:#fff; font-weight:700; flex-shrink:0; }
+  .hdr-title { font-size:20px; font-weight:700; color:#0f172a; }
+  .hdr-sub { font-size:13px; color:#64748b; margin-top:2px; }
+  .hdr-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .nav-btn { font-size:12px; padding:7px 16px; border-radius:20px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:5px; border:1.5px solid; cursor:pointer; }
+  .nav-b26 { border-color:#1d4ed8; background:#1d4ed8; color:#fff; } .nav-b26:hover{background:#1e40af;}
+  .nav-b27 { border-color:#7c3aed; background:#7c3aed; color:#fff; } .nav-b27:hover{background:#6d28d9;}
+  .refresh-btn { border-color:#0f766e; background:#0f766e; color:#fff; } .refresh-btn:hover{background:#115e59;}
+  .badge { font-size:11px; padding:4px 12px; border-radius:20px; font-weight:600; background:#ccfbf1; color:#0f766e; border:1px solid #99f6e4; }
+
+  #status-bar { font-size:11px; padding:6px 14px; border-radius:8px; margin-bottom:1.25rem; display:none; }
+  .sb-loading { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
+  .sb-ok      { background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; }
+  .sb-err     { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+
+  /* FILTER BAR */
+  .filter-bar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:.85rem 1.1rem; margin-bottom:1.5rem; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .filter-bar label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#64748b; }
+  .seg { display:inline-flex; border:1.5px solid #e2e8f0; border-radius:20px; overflow:hidden; }
+  .seg button { font-size:12px; padding:6px 16px; border:none; background:#fff; color:#64748b; font-weight:600; cursor:pointer; }
+  .seg button.active { background:#0f766e; color:#fff; }
+  select { font-size:12px; padding:6px 12px; border-radius:8px; border:1.5px solid #e2e8f0; background:#fff; color:#1e293b; font-weight:600; cursor:pointer; min-width:180px; }
+  .filter-spacer { flex:1; }
+  .scope-tag { font-size:12px; color:#0f766e; font-weight:700; }
+
+  /* SECTIONS */
+  .section { margin-bottom:2rem; }
+  .sec-head { display:flex; align-items:center; gap:10px; margin-bottom:.9rem; }
+  .sec-kicker { font-size:10px; font-weight:700; letter-spacing:.12em; color:#0f766e; text-transform:uppercase; }
+  .sec-title { font-size:16px; font-weight:700; color:#0f172a; }
+  .card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.1rem 1.25rem; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .card-title { font-size:13px; font-weight:600; color:#1e293b; margin-bottom:.75rem; }
+  .note { font-size:11px; color:#64748b; background:#f8fafc; border-radius:8px; padding:8px 12px; margin-top:.75rem; line-height:1.6; }
+
+  /* SCORECARD GRID */
+  .score-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(225px,1fr)); gap:12px; }
+  .score-card { background:#fff; border:1px solid #e2e8f0; border-left:4px solid #94a3b8; border-radius:10px; padding:.9rem 1rem; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .score-card.good { border-left-color:#16a34a; }
+  .score-card.bad  { border-left-color:#dc2626; }
+  .score-card.neutral { border-left-color:#0891b2; }
+  .sc-val { font-size:21px; font-weight:800; color:#0f172a; letter-spacing:-.01em; display:flex; align-items:baseline; gap:7px; flex-wrap:wrap; }
+  .sc-from { color:#94a3b8; font-weight:700; font-size:18px; }
+  .sc-arrow { color:#cbd5e1; font-weight:700; }
+  .sc-label { font-size:12px; font-weight:600; color:#334155; margin-top:5px; }
+  .sc-sub { font-size:10.5px; color:#94a3b8; margin-top:3px; }
+  .sc-delta { font-size:10.5px; font-weight:700; padding:1px 7px; border-radius:8px; display:inline-block; margin-top:5px; }
+  .d-good{background:#dcfce7;color:#166534} .d-bad{background:#fee2e2;color:#991b1b} .d-flat{background:#f1f5f9;color:#475569}
+
+  /* TABLES */
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  .tbl-wrap { overflow-x:auto; }
+  .tbl { width:100%; border-collapse:collapse; font-size:12px; }
+  .tbl thead tr { background:#f8fafc; }
+  .tbl th { padding:9px 11px; text-align:right; font-weight:600; font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:.04em; border-bottom:1.5px solid #e2e8f0; white-space:nowrap; }
+  .tbl th.l { text-align:left; }
+  .tbl td { padding:8px 11px; text-align:right; border-bottom:1px solid #f1f5f9; color:#1e293b; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .tbl td.l { text-align:left; font-weight:500; }
+  .tbl tr:hover:not(.tot) td { background:#f8fafc; }
+  .tbl tr.tot td { background:#f1f5f9; font-weight:700; border-top:1.5px solid #e2e8f0; border-bottom:none; }
+  .pill { display:inline-block; padding:2px 9px; border-radius:10px; font-size:11px; font-weight:600; }
+  .p-g{background:#dcfce7;color:#166534} .p-b{background:#dbeafe;color:#1e40af}
+  .p-a{background:#fef3c7;color:#92400e} .p-r{background:#fee2e2;color:#991b1b} .p-s{background:#f1f5f9;color:#475569}
+
+  /* FY TOGGLE */
+  .fy-toggle { display:inline-flex; border:1.5px solid #e2e8f0; border-radius:20px; overflow:hidden; margin-left:auto; }
+  .fy-toggle button { font-size:11px; padding:5px 14px; border:none; background:#fff; color:#64748b; font-weight:700; cursor:pointer; }
+  .fy-toggle button.active { background:#0f172a; color:#fff; }
+
+  .skel { background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%); background-size:200% 100%; animation:shimmer 1.2s infinite; border-radius:6px; }
+  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+  .footer { margin-top:2.5rem; padding-top:1rem; border-top:1px solid #e2e8f0; font-size:11px; color:#94a3b8; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+  @media(max-width:760px){ .grid2{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-left">
+      <div class="hdr-icon">R</div>
+      <div>
+        <div class="hdr-title">HR Risk Scorecard — FY26 → FY27</div>
+        <div class="hdr-sub">Combined EHFL + Easy Digital &nbsp;·&nbsp; All attrition metrics on Avg HC denominator &nbsp;·&nbsp; Live from Google Sheets</div>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <button class="nav-btn refresh-btn" onclick="loadAll()">&#8635; Refresh</button>
+      <a href="index.html" class="nav-btn nav-b26">FY 2025-26</a>
+      <a href="fy27_dashboard.html" class="nav-btn nav-b27">FY 2026-27</a>
+      <span class="badge" id="hdr-badge">Loading…</span>
+    </div>
+  </div>
+  <div id="status-bar"></div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <label>View</label>
+    <div class="seg" id="scope-seg">
+      <button class="active" data-scope="all"    onclick="setScope('all',this)">PAN India</button>
+      <button                data-scope="zone"   onclick="setScope('zone',this)">By Zone</button>
+      <button                data-scope="region" onclick="setScope('region',this)">By Region</button>
+    </div>
+    <select id="scope-select" style="display:none" onchange="applyFilter()"></select>
+    <div class="filter-spacer"></div>
+    <span class="scope-tag" id="scope-tag">Scope: PAN India</span>
+  </div>
+
+  <!-- SECTION 1: RISK SCORECARD -->
+  <div class="section">
+    <div class="sec-head">
+      <div>
+        <div class="sec-kicker">Section 01 · Risk Scorecard</div>
+        <div class="sec-title">FY26 vs FY27 HR Risk Scorecard</div>
+      </div>
+    </div>
+    <div class="score-grid" id="score-grid">
+      <div class="skel" style="height:96px;grid-column:1/-1">&nbsp;</div>
+    </div>
+    <div class="note" id="score-note">Loading…</div>
+  </div>
+
+  <!-- SECTION 2: ACTIVE TENURE DISTRIBUTION -->
+  <div class="section">
+    <div class="sec-head">
+      <div>
+        <div class="sec-kicker">Section 02 · Workforce Stability</div>
+        <div class="sec-title">Active Employee Tenure Distribution — FOS vs Non-FOS</div>
+      </div>
+      <div class="fy-toggle" id="tenure-fy">
+        <button class="active" data-fy="26" onclick="setTenureFY('26',this)">FY26 close</button>
+        <button data-fy="27" onclick="setTenureFY('27',this)">FY27 active</button>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Tenure band breakdown</div>
+        <div class="tbl-wrap"><table class="tbl" id="tenure-tbl"></table></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Distribution by tenure band</div>
+        <div style="position:relative;height:260px"><canvas id="c-tenure"></canvas></div>
+      </div>
+    </div>
+    <div class="note" id="tenure-note">Loading…</div>
+  </div>
+
+  <!-- SECTION 3: FOS EXIT ANALYSIS -->
+  <div class="section">
+    <div class="sec-head">
+      <div>
+        <div class="sec-kicker">Section 03 · FOS Retention</div>
+        <div class="sec-title">FOS Exit Analysis — Regret vs Non-Regret &amp; Tenure at Exit</div>
+      </div>
+      <div class="fy-toggle" id="fosexit-fy">
+        <button class="active" data-fy="26" onclick="setFosFY('26',this)">FY26</button>
+        <button data-fy="27" onclick="setFosFY('27',this)">FY27</button>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Regret classification (FOS exits)</div>
+        <div class="tbl-wrap"><table class="tbl" id="fosexit-tbl"></table></div>
+      </div>
+      <div class="card">
+        <div class="card-title">FOS exit tenure distribution</div>
+        <div style="position:relative;height:260px"><canvas id="c-fosexit"></canvas></div>
+      </div>
+    </div>
+    <div class="note" id="fosexit-note">Loading…</div>
+  </div>
+
+  <div class="footer">
+    <span>Easy Home Finance + Easy Digital &nbsp;·&nbsp; HR Risk Scorecard &nbsp;·&nbsp; <span id="footer-ts">—</span></span>
+    <span>
+      <a href="index.html" style="color:#1d4ed8;text-decoration:none">FY 2025-26 Dashboard</a> &nbsp;·&nbsp;
+      <a href="fy27_dashboard.html" style="color:#7c3aed;text-decoration:none">FY 2026-27 Dashboard</a>
+    </span>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════ CONFIG ═══════════════════════ */
+const SHEET_ID   = '1CrhK96ykb4etKSgc5EA-haxMDgs2q-ikyGhUfdeCfUE';
+const FY26_GID   = '1878721795';   // FY 2025-26 tab
+const FY27_GID   = '174531658';    // FY 2026-27 tab
+
+const FY_MONTHS  = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
+const G='#16a34a', B='#1d4ed8', R='#dc2626', A='#d97706', P='#7c3aed', T='#0891b2', S='#64748b', TEAL='#0f766e';
+
+const TEN_BANDS  = ['< 6 Months','6–12 Months','1–2 Years','2–3 Years','3 Years+'];
+const TEN_COLORS = [R,A,B,P,G];
+const EXIT_BANDS = ['0–3 mo','3–6 mo','6–12 mo','1–2 yr','2yr+'];
+const EXIT_COLORS= [R,A,'#f59e0b',P,G];
+
+let RAW = { 26:null, 27:null };   // parsed employee arrays
+let CH  = {};
+let SCOPE = { type:'all', value:null };
+let tenureFY = '26', fosFY = '26';
+
+/* ═══════════════════════ STATUS ═══════════════════════ */
+function setStatus(msg, type='loading') {
+  const el=document.getElementById('status-bar');
+  el.style.display='block'; el.className=`sb-${type}`; el.textContent=msg;
+  if(type==='ok') setTimeout(()=>el.style.display='none',4000);
+}
+
+/* ═══════════════════════ FETCH + PARSE ═══════════════════════ */
+async function fetchSheet(gid) {
+  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
+  const res=await fetch(url,{cache:'no-store'});
+  if(!res.ok) throw new Error(`HTTP ${res.status} — make sure sheet is publicly shared`);
+  return res.text();
+}
+function parseCSV(text) {
+  const rows=[];
+  for(const line of text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n')) {
+    if(!line.trim()) continue;
+    const cols=[]; let cur='',inQ=false;
+    for(const c of line){
+      if(c==='"') inQ=!inQ;
+      else if(c===','&&!inQ){cols.push(cur.trim());cur='';}
+      else cur+=c;
+    }
+    cols.push(cur.trim()); rows.push(cols);
+  }
+  return rows;
+}
+function parseDate(val) {
+  if(!val) return null;
+  const s=String(val).trim(); if(!s) return null;
+  const n=Number(s);
+  if(!isNaN(n)&&n>1000&&n<200000) return new Date(Math.round((n-25569)*86400000));
+  let d=new Date(s); if(!isNaN(d)) return d;
+  const p=s.split(/[\/\-\.]/);
+  if(p.length===3){
+    const [a,b,c]=p.map(Number);
+    if(p[2].length===4){d=new Date(c,a-1,b);if(!isNaN(d))return d; d=new Date(c,b-1,a);if(!isNaN(d))return d;}
+    if(p[0].length===4){d=new Date(a,b-1,c);if(!isNaN(d))return d;}
+  }
+  return null;
+}
+function getMoIdx(date, startYr) {
+  if(!date) return -1;
+  for(let i=0;i<12;i++){
+    const yr = i<9?startYr:startYr+1, mo = i<9?i+4:i-8;
+    if(date.getFullYear()===yr&&date.getMonth()+1===mo) return i;
+  }
+  return -1;
+}
+
+/* ═══════════════════════ BUILD EMPLOYEES ═══════════════════════ */
+function buildEmps(rows, startYr) {
+  const hdr=rows[0].map(h=>h.trim().toLowerCase());
+  const ci=k=>hdr.indexOf(k.toLowerCase());
+  const iDOJ=ci('date_of_joining'), iRel=ci('relieving_date'), iStat=ci('status');
+  const iJoin=ci('joining'), iReg=ci('region'), iZone=ci('zone'), iHONon=ci('ho/non');
+  const i90=ci('<90 exits'), iReason=ci('reason for exit'), iType=ci('type'); const iCo=ci('company');
+
+  return rows.slice(1).map(row=>{
+    if(!row||row.length<5) return null;
+    const doj    = parseDate(row[iDOJ]);
+    const reliev = parseDate(row[iRel]);
+    const status = (row[iStat]||'').trim().toLowerCase();
+    const joining= (row[iJoin]||'').trim().toLowerCase();
+    const isExit    = status==='exit';
+    const exitMoIdx = isExit ? getMoIdx(reliev, startYr) : -1;
+    const tenureDays= (isExit&&doj&&reliev) ? Math.round((reliev-doj)/86400000) : null;
+    const hoNon = (row[iHONon]||'').trim() || 'Other';
+    const isFOS = hoNon.toLowerCase().includes('fos');
+    const typeRaw = (row[iType]||'').trim(), typeLC=typeRaw.toLowerCase();
+    const region = (iReg>=0?(row[iReg]||'').trim():'')||'Unknown';
+    const zone   = (iZone>=0?(row[iZone]||'').trim():'')||'';
+    return {
+      isOpening: joining==='opening', isJoining: joining==='joining', isExit,
+      exitMoIdx, tenureDays, doj,
+      region, zone, hoNon, isFOS,
+      sub90:(()=>{ const v=(row[i90]||'').trim().toLowerCase(); return v.includes('less')&&v.includes('90'); })(),
+      reason:(row[iReason]||'').trim(),
+      isRegret:    isExit && typeLC.includes('regret') && !typeLC.includes('non'),
+      isNonRegret: isExit && typeLC.includes('non'),
+      isAbscond:   isExit && (row[iReason]||'').toLowerCase().includes('abscond'),
+    };
+  }).filter(Boolean);
+}
+
+/* ═══════════════════════ FILTER ═══════════════════════ */
+function filterEmps(emps) {
+  if(SCOPE.type==='all'||!SCOPE.value) return emps;
+  if(SCOPE.type==='zone')   return emps.filter(e=>e.zone===SCOPE.value);
+  if(SCOPE.type==='region') return emps.filter(e=>e.region===SCOPE.value);
+  return emps;
+}
+function hasZone(emps){ return emps.some(e=>e.zone); }
+
+/* ═══════════════════════ METRICS ═══════════════════════ */
+function metrics(all, startYr) {
+  const emps = filterEmps(all);
+  const opening = emps.filter(e=>e.isOpening).length;
+  const joinings= emps.filter(e=>e.isJoining).length;
+  const exits   = emps.filter(e=>e.isExit).length;
+  const closing = opening+joinings-exits;
+  const avgHC   = (opening+closing)/2;
+
+  // monthly avg HC (mean across active months)
+  const n=12, momOpen=Array(n).fill(0), momJoin=Array(n).fill(0), momExit=Array(n).fill(0), momClose=Array(n).fill(0);
+  emps.forEach(e=>{ if(e.isJoining){const i=getMoIdxLocal(e,startYr,'join'); if(i>=0)momJoin[i]++;} if(e.isExit&&e.exitMoIdx>=0)momExit[e.exitMoIdx]++; });
+  momOpen[0]=opening; momClose[0]=momOpen[0]+momJoin[0]-momExit[0];
+  for(let i=1;i<n;i++){momOpen[i]=momClose[i-1];momClose[i]=momOpen[i]+momJoin[i]-momExit[i];}
+  let lastIdx=n-1; for(let i=n-1;i>=0;i--){ if(momJoin[i]>0||momExit[i]>0){lastIdx=i;break;} }
+  const momAvg=[]; for(let i=0;i<=lastIdx;i++) momAvg.push((momOpen[i]+momClose[i])/2);
+  const avgMonthlyHC = momAvg.length? momAvg.reduce((s,v)=>s+v,0)/momAvg.length : avgHC;
+
+  const early90  = emps.filter(e=>e.isExit&&e.sub90).length;
+  const regret   = emps.filter(e=>e.isRegret).length;
+  const nonReg   = emps.filter(e=>e.isNonRegret).length;
+  const abscond  = emps.filter(e=>e.isAbscond).length;
+
+  // FOS slice
+  const fos       = emps.filter(e=>e.isFOS);
+  const fosOpen   = fos.filter(e=>e.isOpening).length;
+  const fosJoin   = fos.filter(e=>e.isJoining).length;
+  const fosExit   = fos.filter(e=>e.isExit).length;
+  const fosClose  = fosOpen+fosJoin-fosExit;
+  const fosAvgHC  = (fosOpen+fosClose)/2;
+
+  const pct=(num,den)=>den>0?Math.round(num/den*1000)/10:0;
+  return {
+    startYr, opening, joinings, exits, closing, avgHC:Math.round(avgHC*10)/10,
+    avgMonthlyHC:Math.round(avgMonthlyHC),
+    netGrowth: closing-opening,
+    attrPct:   pct(exits,avgHC),
+    regretPct: pct(regret,avgHC),
+    earlyPct:  pct(early90,avgHC),
+    nonRegPct: pct(nonReg,avgHC),
+    abscPct:   pct(abscond,avgHC),
+    fosClose, fosAvgHC:Math.round(fosAvgHC*10)/10,
+    fosAttrPct: pct(fosExit,fosAvgHC),
+    regret, nonReg, early90, abscond, fosExit,
+  };
+}
+function getMoIdxLocal(e,startYr,kind){ return e.doj?getMoIdx(e.doj,startYr):-1; }
+
+/* ═══════════════════════ ACTIVE TENURE ═══════════════════════ */
+function activeTenure(all, startYr) {
+  // Active = not exited; include Opening + Joining rows that have a DOJ
+  const emps = filterEmps(all).filter(e=>!e.isExit && e.doj);
+  const fyClose=new Date(startYr+1,2,31), today=new Date();
+  const asOf = today<fyClose ? today : fyClose;
+  const bandIdx=d=>{ if(d<180)return 0; if(d<365)return 1; if(d<730)return 2; if(d<1095)return 3; return 4; };
+  const rows=TEN_BANDS.map(()=>({total:0,fos:0,non:0}));
+  emps.forEach(e=>{
+    const days=Math.round((asOf-e.doj)/86400000); if(days<0||isNaN(days)) return;
+    const bi=bandIdx(days); rows[bi].total++;
+    if(e.isFOS) rows[bi].fos++; else rows[bi].non++;
+  });
+  const total=rows.reduce((s,r)=>s+r.total,0);
+  return { rows, total, asOf,
+    fosTotal:rows.reduce((s,r)=>s+r.fos,0),
+    nonTotal:rows.reduce((s,r)=>s+r.non,0) };
+}
+
+/* ═══════════════════════ FOS EXIT ═══════════════════════ */
+function fosExitAnalysis(all, startYr) {
+  const fosExits = filterEmps(all).filter(e=>e.isExit && e.isFOS);
+  const total=fosExits.length;
+  const regret=fosExits.filter(e=>e.isRegret);
+  const nonReg=fosExits.filter(e=>e.isNonRegret);
+  const notTag=fosExits.filter(e=>!e.isRegret&&!e.isNonRegret);
+  const avgTen=arr=>{ const t=arr.filter(e=>e.tenureDays!==null).map(e=>e.tenureDays); return t.length?Math.round(t.reduce((s,v)=>s+v,0)/t.length/30.44*10)/10:0; };
+  // exit tenure bands
+  const eb=d=>{ if(d===null||d<0)return -1; if(d<90)return 0; if(d<180)return 1; if(d<365)return 2; if(d<730)return 3; return 4; };
+  const bands=EXIT_BANDS.map(()=>0);
+  fosExits.forEach(e=>{ const i=eb(e.tenureDays); if(i>=0)bands[i]++; });
+  return {
+    total,
+    regret:{n:regret.length, avgTen:avgTen(regret), pct: total?Math.round(regret.length/total*100):0},
+    nonReg:{n:nonReg.length, avgTen:avgTen(nonReg), pct: total?Math.round(nonReg.length/total*100):0},
+    notTag:{n:notTag.length, avgTen:avgTen(notTag), pct: total?Math.round(notTag.length/total*100):0},
+    bands, overallAvgTen: avgTen(fosExits),
+  };
+}
+
+/* ═══════════════════════ SCORE CARD RENDER ═══════════════════════ */
+function deltaTag(from,to,lowerBetter,unit='') {
+  const diff=Math.round((to-from)*10)/10;
+  if(diff===0) return `<span class="sc-delta d-flat">no change</span>`;
+  const improved = lowerBetter ? diff<0 : diff>0;
+  const cls=improved?'d-good':'d-bad';
+  const sign=diff>0?'+':'';
+  return `<span class="sc-delta ${cls}">${sign}${diff}${unit} ${improved?'▲ improved':'▼ worse'}</span>`;
+}
+function scoreCard(label, sub, from, to, opt={}) {
+  const { unit='', lowerBetter=false, fmt=v=>v.toLocaleString(), noDelta=false } = opt;
+  let cls='neutral';
+  if(!noDelta){ const improved=lowerBetter?to<from:to>from; cls = to===from?'neutral':(improved?'good':'bad'); }
+  const delta = noDelta ? '' : deltaTag(from,to,lowerBetter,unit);
+  return `<div class="score-card ${cls}">
+    <div class="sc-val"><span class="sc-from">${fmt(from)}${unit}</span><span class="sc-arrow">→</span><span>${fmt(to)}${unit}</span></div>
+    <div class="sc-label">${label}</div>
+    <div class="sc-sub">${sub}</div>
+    ${delta}
+  </div>`;
+}
+function renderScorecard() {
+  if(!RAW[26]||!RAW[27]) return;
+  const m26=metrics(RAW[26],2025), m27=metrics(RAW[27],2026);
+  const g=document.getElementById('score-grid');
+  g.innerHTML = [
+    scoreCard('Headcount · Open → Close FY27','FY27 opening → closing', m27.opening, m27.closing, {noDelta:true}),
+    scoreCard('Net Headcount Growth','FY26 vs FY27 net add', m26.netGrowth, m27.netGrowth, {fmt:v=>(v>=0?'+':'')+v.toLocaleString()}),
+    scoreCard('New Hires','Total joinings in FY', m26.joinings, m27.joinings),
+    scoreCard('Avg Monthly HC','Mean monthly (open+close)/2', m26.avgMonthlyHC, m27.avgMonthlyHC),
+    scoreCard('Overall Attrition','Exits ÷ Avg HC', m26.attrPct, m27.attrPct, {unit:'%',lowerBetter:true,fmt:v=>v}),
+    scoreCard('Regret Attrition','Regret exits ÷ Avg HC', m26.regretPct, m27.regretPct, {unit:'%',lowerBetter:true,fmt:v=>v}),
+    scoreCard('Early Exits <90 Day','&lt;90-day exits ÷ Avg HC', m26.earlyPct, m27.earlyPct, {unit:'%',lowerBetter:true,fmt:v=>v}),
+    scoreCard('Non-Regret Attrition','Non-regret exits ÷ Avg HC', m26.nonRegPct, m27.nonRegPct, {unit:'%',lowerBetter:true,fmt:v=>v}),
+    scoreCard('FOS Attrition','FOS exits ÷ Avg FOS HC', m26.fosAttrPct, m27.fosAttrPct, {unit:'%',lowerBetter:true,fmt:v=>v}),
+    scoreCard('FOS / Sales Closing HC','Origination engine', m26.fosClose, m27.fosClose),
+    scoreCard('Absconding','Absconding exits ÷ Avg HC', m26.abscPct, m27.abscPct, {unit:'%',lowerBetter:true,fmt:v=>v}),
+    scoreCard('Total Exits','FY exit volume', m26.exits, m27.exits, {lowerBetter:true}),
+  ].join('');
+  document.getElementById('score-note').innerHTML =
+    `Each card shows <b>FY26 → FY27</b>. Green = improved, red = worse. Attrition metrics use Avg HC = (Opening + Closing) ÷ 2 as denominator. `+
+    `Scope: <b>${scopeLabel()}</b>. FY27 is in-progress, so its full-year figures will rise as the year completes.`;
+}
+
+/* ═══════════════════════ TENURE RENDER ═══════════════════════ */
+function renderTenure() {
+  const startYr = tenureFY==='26'?2025:2026;
+  if(!RAW[tenureFY]||RAW[tenureFY].length===0){ document.getElementById('tenure-note').textContent=`No FY${tenureFY} data available.`; return; }
+  const t=activeTenure(RAW[tenureFY], startYr);
+  const rows=t.rows.map((r,i)=>`<tr>
+    <td class="l">${TEN_BANDS[i]}</td>
+    <td>${r.total}</td>
+    <td style="color:${B};font-weight:600">${r.fos}</td>
+    <td style="color:${S}">${r.non}</td>
+    <td>${t.total?Math.round(r.total/t.total*100):0}%</td>
+  </tr>`).join('');
+  const tot=`<tr class="tot"><td class="l">Total Active</td><td>${t.total}</td><td style="color:${B}">${t.fosTotal}</td><td style="color:${S}">${t.nonTotal}</td><td>100%</td></tr>`;
+  document.getElementById('tenure-tbl').innerHTML =
+    `<thead><tr><th class="l">Tenure Band</th><th>Total</th><th>FOS</th><th>Non-FOS</th><th>% of Total</th></tr></thead><tbody>${rows}${tot}</tbody>`;
+
+  if(CH.ten) CH.ten.destroy();
+  CH.ten=new Chart(document.getElementById('c-tenure'),{
+    type:'bar',
+    data:{labels:TEN_BANDS,datasets:[
+      {label:'FOS',     data:t.rows.map(r=>r.fos), backgroundColor:B+'cc', borderColor:B, borderWidth:1, borderRadius:3},
+      {label:'Non-FOS', data:t.rows.map(r=>r.non), backgroundColor:S+'aa', borderColor:S, borderWidth:1, borderRadius:3},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:10,boxWidth:12}}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},y:{stacked:true,grid:{color:'rgba(100,116,139,.1)'},ticks:{font:{size:10}}}}
+    }
+  });
+  const newBlood=t.rows[0].total+t.rows[1].total, newPct=t.total?Math.round(newBlood/t.total*100):0;
+  const core=t.rows[3].total+t.rows[4].total, corePct=t.total?Math.round(core/t.total*100):0;
+  document.getElementById('tenure-note').innerHTML =
+    `<b>${t.total.toLocaleString()}</b> active employees as of ${t.asOf.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} `+
+    `(${tenureFY==='27'?'FY27 current':'FY26 close'}). <b>${newPct}%</b> have &lt;1 year tenure (ramp/stability risk), <b>${corePct}%</b> are 2yr+ tenured core. `+
+    `FOS share of active workforce: ${t.total?Math.round(t.fosTotal/t.total*100):0}%. Scope: <b>${scopeLabel()}</b>.`;
+}
+
+/* ═══════════════════════ FOS EXIT RENDER ═══════════════════════ */
+function renderFosExit() {
+  const startYr = fosFY==='26'?2025:2026;
+  if(!RAW[fosFY]||RAW[fosFY].length===0){ document.getElementById('fosexit-note').textContent=`No FY${fosFY} data available.`; return; }
+  const f=fosExitAnalysis(RAW[fosFY], startYr);
+  const row=(lbl,o,cls)=>`<tr>
+    <td class="l" style="color:${cls}">${lbl}</td>
+    <td style="font-weight:600">${o.n}</td>
+    <td>${o.pct}%</td>
+    <td>${o.avgTen} mo</td>
+  </tr>`;
+  document.getElementById('fosexit-tbl').innerHTML =
+    `<thead><tr><th class="l">Category</th><th>FOS Exits</th><th>% of FOS Exits</th><th>Avg Tenure at Exit</th></tr></thead><tbody>
+      ${row('Regret Exits', f.regret, R)}
+      ${row('Non-Regret Exits', f.nonReg, G)}
+      ${f.notTag.n?row('Not Tagged', f.notTag, S):''}
+      <tr class="tot"><td class="l">Total FOS Exits</td><td>${f.total}</td><td>100%</td><td>${f.overallAvgTen} mo</td></tr>
+    </tbody>`;
+
+  if(CH.fos) CH.fos.destroy();
+  CH.fos=new Chart(document.getElementById('c-fosexit'),{
+    type:'bar',
+    data:{labels:EXIT_BANDS,datasets:[{label:'FOS exits',data:f.bands,backgroundColor:EXIT_COLORS.map(c=>c+'cc'),borderColor:EXIT_COLORS,borderWidth:1,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'rgba(100,116,139,.1)'},ticks:{font:{size:10}}}}
+    }
+  });
+  const early=f.bands[0]+f.bands[1], earlyPct=f.total?Math.round(early/f.total*100):0;
+  document.getElementById('fosexit-note').innerHTML =
+    `<b>${f.total}</b> FOS exits in FY${fosFY}. Regret = ${f.regret.n} (${f.regret.pct}%, avg ${f.regret.avgTen} mo tenure — established contributors, primary retention focus). `+
+    `Non-regret = ${f.nonReg.n} (${f.nonReg.pct}%, avg ${f.nonReg.avgTen} mo — early-stage dropouts, onboarding intervention zone). `+
+    `<b>${earlyPct}%</b> of FOS exits left within 6 months. Scope: <b>${scopeLabel()}</b>.`;
+}
+
+/* ═══════════════════════ SCOPE / FILTER UI ═══════════════════════ */
+function scopeLabel(){
+  if(SCOPE.type==='all'||!SCOPE.value) return 'PAN India';
+  return (SCOPE.type==='zone'?'Zone: ':'Region: ')+SCOPE.value;
+}
+function setScope(type, btn) {
+  document.querySelectorAll('#scope-seg button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const sel=document.getElementById('scope-select');
+  if(type==='all'){ SCOPE={type:'all',value:null}; sel.style.display='none'; applyFilter(); return; }
+  // build options from union of both FYs
+  const all=[...(RAW[26]||[]),...(RAW[27]||[])];
+  const key = type==='zone'?'zone':'region';
+  const vals=[...new Set(all.map(e=>e[key]).filter(Boolean))].sort();
+  if(vals.length===0){ alert(`No "${key}" data found in the sheet${key==='zone'?' — add a "zone" column to enable zone filtering.':''}.`); return; }
+  sel.innerHTML = vals.map((v,i)=>`<option value="${v}">${v}</option>`).join('');
+  sel.style.display='inline-block';
+  SCOPE={type, value:vals[0]};
+  applyFilter();
+}
+function applyFilter() {
+  const sel=document.getElementById('scope-select');
+  if(SCOPE.type!=='all') SCOPE.value=sel.value;
+  document.getElementById('scope-tag').textContent='Scope: '+scopeLabel();
+  renderScorecard(); renderTenure(); renderFosExit();
+}
+function setTenureFY(fy,btn){ tenureFY=fy; document.querySelectorAll('#tenure-fy button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderTenure(); }
+function setFosFY(fy,btn){ fosFY=fy; document.querySelectorAll('#fosexit-fy button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderFosExit(); }
+
+/* ═══════════════════════ SAFE FETCH HELPER ═══════════════════════ */
+async function safeLoad(gid, startYr) {
+  try {
+    const csv = await fetchSheet(gid);
+    const rows = parseCSV(csv);
+    if(rows.length < 2) return { emps:[], warn:`GID ${gid}: tab appears empty` };
+    const emps = buildEmps(rows, startYr);
+    const hdrFound = rows[0].map(h=>h.trim()).join(', ');
+    if(emps.length === 0) return { emps:[], warn:`GID ${gid}: 0 rows parsed. Headers found: [${hdrFound}]` };
+    const open=emps.filter(e=>e.isOpening).length, join=emps.filter(e=>e.isJoining).length, exit=emps.filter(e=>e.isExit).length;
+    if(open===0 && join===0) return { emps:[], warn:`GID ${gid}: ${emps.length} rows loaded but 0 Opening/Joining found. Check "joining" column has values Opening/Joining. Headers: [${hdrFound}]` };
+    return { emps, warn:null, info:`${emps.length} rows · ${open} opening · ${join} joining · ${exit} exits` };
+  } catch(e) {
+    return { emps:[], warn:`GID ${gid}: ${e.message}` };
+  }
+}
+
+/* ═══════════════════════ MAIN LOAD ═══════════════════════ */
+async function loadAll() {
+  setStatus('⟳  Fetching FY26 + FY27 data from Google Sheets…','loading');
+
+  const [r26, r27] = await Promise.all([safeLoad(FY26_GID, 2025), safeLoad(FY27_GID, 2026)]);
+  RAW[26] = r26.emps;
+  RAW[27] = r27.emps;
+
+  const warnings = [r26.warn, r27.warn].filter(Boolean);
+  const infos    = [r26.info  ? `FY26: ${r26.info}` : null, r27.info  ? `FY27: ${r27.info}` : null].filter(Boolean);
+
+  if(RAW[26].length === 0 && RAW[27].length === 0) {
+    setStatus(`✗  No data loaded from either tab. ${warnings.join(' | ')} — Ensure sheet is publicly shared (Anyone with link → Viewer).`, 'err');
+    return;
+  }
+
+  // Render with whatever data we have
+  const active27 = RAW[27].length > 0 ? metrics(RAW[27],2026).closing : metrics(RAW[26],2025).closing;
+  document.getElementById('hdr-badge').textContent = `${active27.toLocaleString()} Active HC`;
+  applyFilter();
+
+  const ts=new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  document.getElementById('footer-ts').textContent=`Last updated: ${ts}`;
+  const zoneMsg = hasZone([...RAW[26],...RAW[27]]) ? '' : ' · add "zone" column to enable Zone filter';
+  const warnMsg = warnings.length ? ` ⚠ ${warnings.join(' | ')}` : '';
+  setStatus(`✓  ${infos.join(' · ')}${zoneMsg}${warnMsg}`, warnings.length ? 'err' : 'ok');
+}
+loadAll();
+</script>
+</body>
+</html>
