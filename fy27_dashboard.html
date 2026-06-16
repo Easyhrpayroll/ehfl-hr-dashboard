@@ -326,18 +326,34 @@ function parseCSV(text) {
 
 /* ═══════════════════════ DATE ═══════════════════════ */
 function parseDate(val) {
-  if(!val) return null;
+  if(val==null) return null;
   const s=String(val).trim(); if(!s) return null;
-  const n=Number(s);
-  if(!isNaN(n)&&n>1000&&n<200000) return new Date(Math.round((n-25569)*86400000));
-  let d=new Date(s); if(!isNaN(d)) return d;
-  const p=s.split(/[\/\-\.]/);
-  if(p.length===3){
-    const [a,b,c]=p.map(Number);
-    if(p[2].length===4){d=new Date(c,a-1,b);if(!isNaN(d))return d; d=new Date(c,b-1,a);if(!isNaN(d))return d;}
-    if(p[0].length===4){d=new Date(a,b-1,c);if(!isNaN(d))return d;}
+
+  // 1) Google Sheets serial number (e.g. 45748)
+  if(/^\d+(\.\d+)?$/.test(s)){
+    const n=Number(s);
+    if(n>1000 && n<200000) return new Date(Math.round((n-25569)*86400000));
   }
-  return null;
+  // 2) ISO  yyyy-mm-dd  (unambiguous)
+  let m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if(m){ const d=new Date(+m[1],+m[2]-1,+m[3]); return isNaN(d)?null:d; }
+
+  // 3) dd-Mon-yyyy  /  dd Mon yyyy  (textual month, unambiguous)
+  m=s.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3,})[-\/ ](\d{2,4})/);
+  if(m){
+    const mon={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11}[m[2].slice(0,3).toLowerCase()];
+    if(mon!=null){ let y=+m[3]; if(y<100) y+=2000; const d=new Date(y,mon,+m[1]); return isNaN(d)?null:d; }
+  }
+  // 4) numeric dd/mm/yyyy (INDIAN, day-first). Falls back to mm/dd only if day>12.
+  m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/);
+  if(m){
+    let a=+m[1], b=+m[2], y=+m[3]; if(y<100) y+=2000;
+    let day=a, mo=b;                       // default dd/mm
+    if(b>12 && a<=12){ day=b; mo=a; }       // second field can't be a month -> it's mm/dd
+    const d=new Date(y,mo-1,day); return isNaN(d)?null:d;
+  }
+  // 5) last resort
+  const d=new Date(s); return isNaN(d)?null:d;
 }
 function getMoIdx(date) {
   if(!date) return -1;
@@ -350,12 +366,31 @@ function getMoIdx(date) {
 
 /* ═══════════════════════ BUILD EMPLOYEES ═══════════════════════ */
 function buildEmps(rows) {
-  const hdr=rows[0].map(h=>h.trim().toLowerCase());
-  const ci=k=>hdr.indexOf(k.toLowerCase());
-  const iDOJ=ci('date_of_joining'), iRel=ci('relieving_date'), iStat=ci('status');
-  const iJoin=ci('joining'), iReg=ci('region'), iHONon=ci('ho/non'), iHO=ci('ho');
-  const i90=ci('<90 exits'), iReason=ci('reason for exit'), iType=ci('type');
-  const iDept=ci('department'), iCo=ci('company');
+  // Normalize headers by stripping spaces/underscores/punctuation so
+  // "Date of Joining", "date_of_joining" and "DateOfJoining" all match.
+  const norm = s => String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const hdrN = rows[0].map(norm);
+  const ci = (...aliases) => { for(const a of aliases){ const i=hdrN.indexOf(norm(a)); if(i>=0) return i; } return -1; };
+
+  const iDOJ  = ci('date_of_joining','date of joining','doj','joining date','date joined');
+  const iRel  = ci('relieving_date','relieving date','date of relieving','last working date','last working day','lwd','date of leaving','date of exit','exit date','separation date');
+  const iStat = ci('status','employee status','emp status');
+  const iJoin = ci('joining','joining/opening','opening/joining','record type','row type');
+  const iReg  = ci('region','zone','location');
+  const iHONon= ci('ho/non','ho/non-ho','ho vs non-ho','ho non','office type');
+  const iHO   = ci('ho','head office');
+  const i90   = ci('<90 exits','<90 exit','less than 90','sub 90','within 90 days','90 day exit');
+  const iReason=ci('reason for exit','reason of exit','exit reason','reason for leaving','reason for separation','reason');
+  const iType = ci('type','regret/non-regret','regret / non-regret','exit type','regret status','regret');
+  const iDept = ci('department','dept','function');
+  const iCo   = ci('company','entity','organisation','organization');
+
+  // Diagnostic: open DevTools console to verify every needed column resolved.
+  // Any value of -1 means that header name wasn't found — add its real name to the alias list above.
+  console.log('Detected sheet headers:', rows[0]);
+  console.table({ date_of_joining:iDOJ, relieving_date:iRel, status:iStat, joining:iJoin,
+    region:iReg, 'ho/non':iHONon, ho:iHO, '<90 exits':i90, reason:iReason, type:iType,
+    department:iDept, company:iCo });
 
   return rows.slice(1).map(row=>{
     if(!row||row.length<5) return null;
