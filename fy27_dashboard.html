@@ -157,6 +157,8 @@
     <div class="card full">
       <div class="tab-bar">
         <button class="tab-btn active" onclick="showTab('region',this)">Region-wise</button>
+        <button class="tab-btn" onclick="showTab('zone',this)">Zone-wise</button>
+        <button class="tab-btn" onclick="showTab('state',this)">State-wise</button>
         <button class="tab-btn" onclick="showTab('honon',this)">HO vs Non-HO</button>
         <button class="tab-btn" onclick="showTab('type',this)">FOS / Non-Sales / Other</button>
         <button class="tab-btn" onclick="showTab('dept',this)">Department-wise</button>
@@ -164,6 +166,12 @@
       </div>
       <div id="tab-region" class="tab-panel active">
         <div class="tbl-wrap"><table class="tbl" id="tbl-region"></table></div>
+      </div>
+      <div id="tab-zone" class="tab-panel">
+        <div class="tbl-wrap"><table class="tbl" id="tbl-zone"></table></div>
+      </div>
+      <div id="tab-state" class="tab-panel">
+        <div class="tbl-wrap"><table class="tbl" id="tbl-state"></table></div>
       </div>
       <div id="tab-honon" class="tab-panel">
         <div class="tbl-wrap"><table class="tbl" id="tbl-honon"></table></div>
@@ -206,7 +214,7 @@
     <div class="sec-title">Early exits &amp; absconding</div>
     <div class="grid2">
       <div class="card">
-        <div class="card-title">&lt;90 day exits — monthly trend</div>
+        <div class="card-title">Exits by tenure — &lt;90 vs ≥90 days (monthly)</div>
         <div style="position:relative;height:190px"><canvas id="c-early"></canvas></div>
         <div id="early-note" class="note">Loading…</div>
       </div>
@@ -377,6 +385,8 @@ function buildEmps(rows) {
   const iStat = ci('status','employee status','emp status');
   const iJoin = ci('joining','joining/opening','opening/joining','record type','row type');
   const iReg  = ci('region','zone','location');
+  const iZone = ci('zone','zonal','zone name','zonal region','zone/region');
+  const iState= ci('state','state name','province','state/ut','statename');
   const iHONon= ci('ho/non','ho/non-ho','ho vs non-ho','ho non','office type');
   const iHO   = ci('ho','head office');
   const i90   = ci('<90 exits','<90 exit','less than 90','sub 90','within 90 days','90 day exit');
@@ -389,7 +399,7 @@ function buildEmps(rows) {
   // Any value of -1 means that header name wasn't found — add its real name to the alias list above.
   console.log('Detected sheet headers:', rows[0]);
   console.table({ date_of_joining:iDOJ, relieving_date:iRel, status:iStat, joining:iJoin,
-    region:iReg, 'ho/non':iHONon, ho:iHO, '<90 exits':i90, reason:iReason, type:iType,
+    region:iReg, zone:iZone, state:iState, 'ho/non':iHONon, ho:iHO, '<90 exits':i90, reason:iReason, type:iType,
     department:iDept, company:iCo });
 
   return rows.slice(1).map(row=>{
@@ -415,8 +425,12 @@ function buildEmps(rows) {
     return {
       isOpening,isJoining,isExit,joinMoIdx,exitMoIdx,tenureDays,
       region:(row[iReg]||'').trim()||'Unknown',
+      zone:(row[iZone]||'').trim()||'Unknown',
+      state:(row[iState]||'').trim()||'Unknown',
       hoNon, hoLabel,
-      sub90:(()=>{ const v=(row[i90]||'').trim().toLowerCase(); return v.includes('less')&&v.includes('90'); })(),
+      // <90 / ≥90 derived from tenure (LWD − DOJ in the sheet), not a manual column
+      sub90:  (isExit && tenureDays!=null && tenureDays < 90),
+      over90: (isExit && tenureDays!=null && tenureDays >= 90),
       reason:(row[iReason]||'').trim(),
       regretRaw:typeRaw,
       isRegret,
@@ -463,7 +477,7 @@ function compute(emps) {
   const n=FY_MONTHS.length;
   const momOpen=new Array(n).fill(0), momJoin=new Array(n).fill(0),
         momExit=new Array(n).fill(0), momClose=new Array(n).fill(0),
-        momEarly=new Array(n).fill(0), momAbsc=new Array(n).fill(0);
+        momEarly=new Array(n).fill(0), momOver90=new Array(n).fill(0), momAbsc=new Array(n).fill(0);
 
   const BANDS=['0–3 mo','3–6 mo','6–12 mo','1–2 yr','2yr+'];
   const bandColors=[R,A,'#f59e0b',P,G];
@@ -481,7 +495,8 @@ function compute(emps) {
     if(e.isJoining&&e.joinMoIdx>=0) momJoin[e.joinMoIdx]++;
     if(e.isExit&&e.exitMoIdx>=0){
       momExit[e.exitMoIdx]++;
-      if(e.sub90) momEarly[e.exitMoIdx]++;
+      if(e.sub90)  momEarly[e.exitMoIdx]++;
+      if(e.over90) momOver90[e.exitMoIdx]++;
       if(e.reason.toLowerCase().includes('abscond')) momAbsc[e.exitMoIdx]++;
       const bi=getBandIdx(e.tenureDays);
       if(bi>=0) momBands[bi][e.exitMoIdx]++;
@@ -507,6 +522,8 @@ function compute(emps) {
   const momAvgHC = momOpen.slice(0,lastIdx+1).map((_,i)=>(momOpen[i]+momClose[i])/2);
   const attrPct = avgHC>0 ? Math.round(exits/avgHC*1000)/10 : 0;
   const early90 = emps.filter(e=>e.isExit&&e.sub90).length;
+  const over90  = emps.filter(e=>e.isExit&&e.over90).length;
+  const unknownTen = exits - early90 - over90;
   const regret  = emps.filter(e=>e.isRegret).length;
   const nonRegret = emps.filter(e=>e.isNonRegret).length;
   const regretAtt = avgHC>0 ? Math.round(regret/avgHC*1000)/10 : 0;
@@ -539,19 +556,21 @@ function compute(emps) {
   });
 
   const byRegion  = mkBreakdown(emps,e=>e.region,'att');
+  const byZone    = mkBreakdown(emps,e=>e.zone,'att');
+  const byState   = mkBreakdown(emps,e=>e.state,'att');
   const byHOLabel = mkBreakdown(emps,e=>e.hoLabel,'att');
   const byHONon   = mkBreakdown(emps,e=>e.hoNon,'att');
   const byDept    = mkBreakdown(emps,e=>e.dept,'att');
   const byCo      = mkBreakdown(emps,e=>e.co,'att');
 
   return {
-    opening,joinings,exits,closing,avgHC,attrPct,early90,regret,nonRegret,regretAtt,
-    momOpen,momJoin,momExit,momClose,momEarly,momAbsc,momAvgHC,momAtt,momEarlyAtt,
+    opening,joinings,exits,closing,avgHC,attrPct,early90,over90,unknownTen,regret,nonRegret,regretAtt,
+    momOpen,momJoin,momExit,momClose,momEarly,momOver90,momAbsc,momAvgHC,momAtt,momEarlyAtt,
     activeMths,lastIdx,momNHR,
     BANDS,bandColors,bandTotals,momBands,
     avgTenDays,avgTenMo,exits3mo,exits6mo,exits1yr,exits6to12,
     reasons,regretMap,
-    byRegion,byHOLabel,byHONon,byDept,byCo,
+    byRegion,byZone,byState,byHOLabel,byHONon,byDept,byCo,
   };
 }
 
@@ -689,6 +708,8 @@ function renderBreakdown(m) {
     regretAtt: m.regretAtt,
   };
   document.getElementById('tbl-region') .innerHTML=buildBDTable(m.byRegion, t);
+  document.getElementById('tbl-zone')   .innerHTML=buildBDTable(m.byZone,   t);
+  document.getElementById('tbl-state')  .innerHTML=buildBDTable(m.byState,  t);
   document.getElementById('tbl-honon')  .innerHTML=buildBDTable(m.byHOLabel,t);
   document.getElementById('tbl-type')   .innerHTML=buildBDTable(m.byHONon,  t);
   document.getElementById('tbl-dept')   .innerHTML=buildBDTable(m.byDept,   t);
@@ -727,32 +748,36 @@ function renderEarlyAbscond(m) {
   const earlyPcts=m.momEarly.slice(0,li+1).map((v,i)=>m.momExit[i]>0?Math.round(v/m.momExit[i]*100):0);
   const abscPcts =m.momAbsc.slice(0,li+1).map((v,i)=>m.momExit[i]>0?Math.round(v/m.momExit[i]*100):0);
 
-  const miniChart=(id,data,pcts,barCol,key)=>{
+  const miniChart=(id,data,pcts,barCol,key,data2,barCol2,seriesLabels)=>{
     if(CH[key]) CH[key].destroy();
+    const ds=[{label:(seriesLabels&&seriesLabels[0])||'count',data,backgroundColor:barCol+'99',borderColor:barCol,borderWidth:1.5,borderRadius:3,yAxisID:'y'}];
+    if(data2) ds.push({label:(seriesLabels&&seriesLabels[1])||'count',data:data2,backgroundColor:barCol2+'99',borderColor:barCol2,borderWidth:1.5,borderRadius:3,yAxisID:'y'});
+    ds.push({label:'% of exits',data:pcts,type:'line',borderColor:R,tension:.3,pointRadius:3,pointBackgroundColor:R,fill:false,borderDash:[4,3],yAxisID:'y1'});
     CH[key]=new Chart(document.getElementById(id),{
       type:'bar',
-      data:{labels:mths,datasets:[
-        {data,backgroundColor:barCol+'99',borderColor:barCol,borderWidth:1.5,borderRadius:3,yAxisID:'y'},
-        {data:pcts,type:'line',borderColor:R,tension:.3,pointRadius:3,pointBackgroundColor:R,fill:false,borderDash:[4,3],yAxisID:'y1'},
-      ]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      data:{labels:mths,datasets:ds},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:!!data2,position:'top',labels:{font:{size:9},boxWidth:10,padding:6}}},
         scales:{
           x:{ticks:{font:{size:9},autoSkip:false,maxRotation:0},grid:{display:false}},
-          y:{ticks:{font:{size:9}},grid:{color:'rgba(100,116,139,.1)'}},
-          y1:{ticks:{font:{size:9},callback:v=>v+'%'},grid:{display:false},position:'right'}
+          y:{beginAtZero:true,ticks:{font:{size:9}},grid:{color:'rgba(100,116,139,.1)'}},
+          y1:{beginAtZero:true,ticks:{font:{size:9},callback:v=>v+'%'},grid:{display:false},position:'right'}
         }
       }
     });
   };
 
-  miniChart('c-early', m.momEarly.slice(0,li+1), earlyPcts, A, 'early');
+  miniChart('c-early', m.momEarly.slice(0,li+1), earlyPcts, A, 'early', m.momOver90.slice(0,li+1), G, ['<90 days','≥90 days']);
   miniChart('c-abscond', m.momAbsc.slice(0,li+1), abscPcts, P, 'absc');
 
   const early90Pct=m.exits>0?Math.round(m.early90/m.exits*100):0;
+  const over90Pct =m.exits>0?Math.round(m.over90/m.exits*100):0;
+  const unkPct    =m.exits>0?Math.round(m.unknownTen/m.exits*100):0;
   const abscTotal=m.momAbsc.slice(0,li+1).reduce((s,v)=>s+v,0);
   const abscPct  =m.exits>0?Math.round(abscTotal/m.exits*100):0;
-  document.getElementById('early-note').textContent=
-    `${m.early90} total exits within 90 days (${early90Pct}% of all exits). Bar = count, dashed line = % of that month's exits.`;
+  document.getElementById('early-note').innerHTML=
+    `<b>${m.early90}</b> exits &lt;90 days (${early90Pct}%) &nbsp;·&nbsp; <b>${m.over90}</b> exits ≥90 days (${over90Pct}%)`
+    + (m.unknownTen>0?` &nbsp;·&nbsp; ${m.unknownTen} unknown (${unkPct}%) — missing DOJ/LWD`:'')
+    + `. Tenure = LWD − DOJ · dashed line = &lt;90 as % of month's exits.`;
   document.getElementById('abscond-note').textContent=
     `${abscTotal} total absconding exits (${abscPct}% of all exits). Auto-detected from "Absconding" in Reason for Exit column.`;
 }
