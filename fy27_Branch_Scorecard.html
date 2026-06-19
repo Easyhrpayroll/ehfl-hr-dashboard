@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EHFL · Branch Performance · FY27</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --red:#FF1616;--red-d:#C60E0E;
+  --ink:#1a1a1c;--sub:#6b7280;
+  --line:#e5e7eb;--soft:#f3f4f6;--card:#fff;--bg:#f5f6f8;
+  --g:#16803c;--g-bg:#dcfce7;--g-bd:#bbf7d0;
+  --a:#b45309;--a-bg:#fef3c7;--a-bd:#fde68a;
+  --r:#dc2626;--r-bg:#fee2e2;--r-bd:#fca5a5;
+  --sh:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.07);
+  --rad:10px;
+  --ff:"Calibri","Segoe UI",system-ui,Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--ff);background:var(--bg);color:var(--ink);font-size:13px;-webkit-font-smoothing:antialiased}
+
+/* ── TOPBAR ── */
+.bar{background:linear-gradient(115deg,#b80e0e 0%,var(--red) 60%,#ff4444 100%);color:#fff;position:relative;overflow:hidden}
+.bar::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.06);clip-path:polygon(62% 0,100% 0,100% 100%,70% 100%)}
+.bar-in{max-width:1600px;margin:0 auto;padding:13px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:relative;z-index:1}
+.logo{width:38px;height:38px;border-radius:8px;background:#fff;color:var(--red);display:grid;place-items:center;font-weight:800;font-size:16px;flex:none;box-shadow:0 2px 8px rgba(0,0,0,.22)}
+.btext h1{font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.btext p{font-size:11.5px;opacity:.88;margin-top:1px}
+.bright{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pill{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.32);padding:4px 12px;border-radius:99px;font-size:11.5px;font-weight:600}
+.period-pill{background:rgba(255,255,255,.25);border:1px solid rgba(255,255,255,.5);padding:4px 14px;border-radius:99px;font-size:12px;font-weight:700}
+.asof{font-size:11px;opacity:.9;text-align:right;line-height:1.5}
+.asof b{font-weight:700}
+.btn{border:none;cursor:pointer;font-family:var(--ff);font-weight:600;font-size:12px;padding:7px 13px;border-radius:7px;display:inline-flex;align-items:center;gap:6px;transition:.15s}
+.btn-w{background:#fff;color:var(--red);box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.btn-w:hover{transform:translateY(-1px)}
+.btn-w:disabled{opacity:.55;cursor:wait;transform:none}
+.barsub{max-width:1600px;margin:0 auto;padding:5px 20px;font-size:11px;color:rgba(255,255,255,.88);border-top:1px solid rgba(255,255,255,.14);position:relative;z-index:1}
+
+/* ── SITE NAV ── */
+.sitenav{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:100;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.sitenav-in{max-width:1600px;margin:0 auto;padding:0 20px;display:flex;align-items:center;gap:2px}
+.navlink{display:inline-flex;align-items:center;gap:6px;padding:10px 14px;font-size:12.5px;font-weight:600;color:var(--sub);text-decoration:none;border-bottom:2px solid transparent;transition:.15s;white-space:nowrap}
+.navlink:hover{color:var(--ink);border-bottom-color:var(--line)}
+.navlink.active{color:var(--red);border-bottom-color:var(--red)}
+.navlink svg{flex:none;opacity:.75}
+.navlink.active svg{opacity:1}
+
+/* ── WRAP ── */
+.wrap{max-width:1600px;margin:0 auto;padding:12px 20px 56px}
+
+/* ── PERIOD BAR ── */
+.period-bar{background:var(--card);border:1px solid var(--line);border-radius:var(--rad);box-shadow:var(--sh);padding:10px 14px;margin-bottom:10px;display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.fl{display:flex;flex-direction:column;gap:3px}
+.fl label{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+select,input[type=search]{font-family:var(--ff);font-size:12.5px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:7px;padding:7px 10px;outline:none;transition:.14s}
+select:focus,input[type=search]:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(255,22,22,.1)}
+.btn-apply{background:var(--red);color:#fff;border:none;padding:8px 20px;border-radius:7px;font-family:var(--ff);font-weight:700;font-size:12.5px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:7px}
+.btn-apply:hover{background:var(--red-d);transform:translateY(-1px)}
+.btn-apply:disabled{opacity:.55;cursor:wait;transform:none}
+.cur-period{font-size:11.5px;color:var(--sub);margin-left:auto;padding:7px 0}
+.cur-period b{color:var(--ink)}
+.api-note{font-size:11px;color:var(--g);background:var(--g-bg);border:1px solid var(--g-bd);padding:4px 10px;border-radius:6px}
+
+/* ── STATUS ── */
+.status-bar{display:flex;align-items:center;gap:8px;padding:8px 13px;border-radius:8px;border:1px solid var(--line);background:var(--card);font-size:12px;margin-bottom:10px}
+.sdot{width:8px;height:8px;border-radius:50%;flex:none}
+.sb-live .sdot{background:var(--g);box-shadow:0 0 0 3px var(--g-bg)}
+.sb-load .sdot{background:#f59e0b;box-shadow:0 0 0 3px #fef3c7;animation:pulse 1s infinite}
+.sb-err  .sdot{background:var(--r);box-shadow:0 0 0 3px var(--r-bg)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.s-muted{color:var(--sub)}
+.status-bar code{background:var(--soft);padding:1px 5px;border-radius:4px;font-size:11px}
+
+/* ── KPI CARDS ── */
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;margin-bottom:10px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--rad);padding:11px 13px;box-shadow:var(--sh);position:relative;overflow:hidden}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+.kpi.kr::before{background:var(--red)}  .kpi.kg::before{background:var(--g)}
+.kpi.ka::before{background:var(--a)}    .kpi.kb::before{background:#1a73e8}
+.kpi.ko::before{background:#7c3aed}     .kpi.kp::before{background:#0891b2}
+.klbl{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+.kval{font-size:20px;font-weight:800;margin-top:3px;line-height:1;letter-spacing:-.01em}
+.ksub{font-size:10px;color:var(--sub);margin-top:3px}
+
+/* ── CHARTS ── */
+.charts-r1{display:grid;grid-template-columns:170px 1fr 1fr 1fr;gap:9px;margin-bottom:9px}
+.charts-r2{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:10px}
+.charts-r3{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:10px}
+.cc{background:var(--card);border:1px solid var(--line);border-radius:var(--rad);padding:11px 13px;box-shadow:var(--sh)}
+.cc h3{font-size:12px;font-weight:700;margin-bottom:1px}
+.cc .cap{font-size:10px;color:var(--sub);margin-bottom:6px}
+.cbox{position:relative;height:155px}
+.cbox-tall{position:relative;height:195px}
+
+/* ── FILTER PANEL ── */
+.ctrls{background:var(--card);border:1px solid var(--line);border-radius:var(--rad);box-shadow:var(--sh);margin-bottom:10px}
+.crow{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;padding:10px 12px}
+.fgrow{flex:1 1 160px}.fgrow input{width:100%}
+.sp{flex:1}
+.bsm{background:var(--soft);color:var(--ink);border:1px solid var(--line);padding:7px 11px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;transition:.14s;font-family:var(--ff)}
+.bsm:hover{border-color:var(--red);color:var(--red)}
+.lgrow{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 10px;border-top:1px solid var(--soft)}
+.lg{display:inline-flex;align-items:center;gap:5px;font-size:11px;border:1px solid var(--line);border-radius:99px;padding:3px 9px;background:#fff;margin-top:7px}
+.lsw{width:8px;height:8px;border-radius:2px;flex:none}
+.lg.g .lsw{background:var(--g)}.lg.a .lsw{background:var(--a)}.lg.r .lsw{background:var(--r)}
+
+/* ── TABLE ── */
+.tcard{background:var(--card);border:1px solid var(--line);border-radius:var(--rad);box-shadow:var(--sh);overflow:hidden}
+.thead-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.thead-bar h2{font-size:13px;font-weight:700}
+.cnt{font-size:11.5px;color:var(--sub)}
+.export-btns{margin-left:auto;display:flex;gap:6px}
+.btn-exp{background:#fff;border:1px solid var(--line);color:var(--sub);padding:5px 11px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--ff);transition:.12s;display:inline-flex;align-items:center;gap:5px}
+.btn-exp:hover{border-color:var(--g);color:var(--g)}
+.tscroll{overflow-x:auto;max-height:65vh;overflow-y:auto}
+table{border-collapse:collapse;width:100%;font-size:11.5px}
+thead th{position:sticky;top:0;z-index:4;background:#f8f9fa;color:var(--sub);font-weight:700;
+  text-transform:uppercase;letter-spacing:.03em;font-size:10px;padding:8px 7px;
+  text-align:right;border-bottom:2px solid var(--line);white-space:nowrap;
+  cursor:pointer;user-select:none;border-right:1px solid var(--soft)}
+thead th.l{text-align:left}
+thead th:hover{color:var(--ink);background:#f0f1f3}
+thead th.sa::after{content:" ▲";font-size:8px}
+thead th.sd::after{content:" ▼";font-size:8px}
+/* column group separators */
+thead th.grp-sep{border-left:2px solid var(--line)}
+tbody td{padding:6px 7px;text-align:right;border-bottom:1px solid var(--soft);white-space:nowrap;border-right:1px solid rgba(229,231,235,.4)}
+tbody td.l{text-align:left}
+tbody td.grp-sep{border-left:2px solid var(--line)}
+tr:hover td{background:#fafbfc}
+/* zone rows */
+tr.zr td{background:#f1f2f5;border-bottom:1px solid var(--line);padding:8px 7px;cursor:pointer}
+tr.zr:hover td{background:#eaebee}
+.zh{display:flex;align-items:center;gap:8px}
+.chev{width:13px;height:13px;flex:none;transition:transform .16s;color:var(--sub)}
+tr.zr.col .chev{transform:rotate(-90deg)}
+.zn{font-weight:800;font-size:12px}
+.zbr{font-size:11px;color:var(--sub)}
+.rib{display:flex;height:6px;width:80px;border-radius:3px;overflow:hidden;border:1px solid var(--line);flex:none}
+.rib span{display:block;height:100%}
+.rg{background:var(--g)}.ra{background:var(--a)}.rr{background:var(--r)}
+.zmix{font-size:11px;color:var(--sub)}
+.zmix b{color:var(--ink)}
+tr.zt td{font-weight:700;background:#ebebee;border-top:1px solid var(--line);border-bottom:2px solid var(--line);font-size:11.5px}
+tr.grand td{font-weight:700;background:var(--ink);color:#fff;padding:9px 7px;border:none;font-size:12px}
+/* badges */
+.badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;border:1px solid;display:inline-block}
+.bG{color:var(--g);background:var(--g-bg);border-color:var(--g-bd)}
+.bA{color:var(--a);background:var(--a-bg);border-color:var(--a-bd)}
+.bR{color:var(--r);background:var(--r-bg);border-color:var(--r-bd)}
+td.cG{color:var(--g);font-weight:700}
+td.cA{color:var(--a);font-weight:700}
+td.cR{color:var(--r);font-weight:700}
+
+.empty{padding:40px;text-align:center;color:var(--sub)}
+footer{text-align:center;font-size:11px;color:var(--sub);margin-top:14px;line-height:1.9}
+
+/* LOADING OVERLAY */
+#overlay{position:fixed;inset:0;background:rgba(255,255,255,.92);display:grid;place-items:center;z-index:999;transition:opacity .3s}
+#overlay.hidden{opacity:0;pointer-events:none}
+.spinner{width:38px;height:38px;border:4px solid var(--line);border-top-color:var(--red);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ov-txt{font-size:13px;color:var(--sub);text-align:center}
+
+@media(max-width:1200px){.kpis{grid-template-columns:repeat(4,1fr)}.charts-r1{grid-template-columns:1fr 1fr}}
+@media(max-width:700px){.kpis{grid-template-columns:repeat(2,1fr)}.charts-r1,.charts-r2,.charts-r3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="overlay">
+  <div><div class="spinner"></div><div class="ov-txt" id="ovTxt">Loading branch data…</div></div>
+</div>
+
+<!-- TOPBAR -->
+<div class="bar">
+  <div class="bar-in">
+    <div class="logo">EH</div>
+    <div class="btext">
+      <h1>Easy Home Finance Limited</h1>
+      <p>Branch Performance Dashboard · FY 2026-27</p>
+    </div>
+    <div class="bright">
+      <span class="pill">FY27</span>
+      <span class="period-pill" id="periodPill">FY · FY26-27</span>
+      <div class="asof">Last refreshed<br><b id="asof">—</b></div>
+      <button class="btn btn-w" id="btnRef">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+  <div class="barsub">
+    GREEN = L→D ≥ 20% &nbsp;|&nbsp; AMBER = L→D 10–20% &nbsp;|&nbsp; RED = L→D &lt; 10%
+    &nbsp;·&nbsp; Period controlled by Apps Script → M1/P1 in Branch Score sheet
+  </div>
+</div>
+
+<!-- SITE NAV -->
+<nav class="sitenav">
+  <div class="sitenav-in">
+    <a href="index.html" class="navlink">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      HR Dashboard
+    </a>
+    <a href="fy27_dashboard.html" class="navlink">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      FY27 Dashboard
+    </a>
+    <a href="hr_risk_scorecard.html" class="navlink">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Risk Scorecard
+    </a>
+    <a href="fy27_Branch_Scorecard.html" class="navlink active">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Branch Performance
+    </a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <!-- PERIOD SELECTOR -->
+  <div class="period-bar">
+    <div class="fl">
+      <label>Period Type</label>
+      <select id="selType">
+        <option value="Month">Month</option>
+        <option value="Quarter">Quarter</option>
+        <option value="Half Year">Half Year</option>
+        <option value="FY" selected>FY</option>
+      </select>
+    </div>
+    <div class="fl">
+      <label>Period Value</label>
+      <select id="selValue"></select>
+    </div>
+    <button class="btn-apply" id="btnApply">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+      Apply &amp; Refresh
+    </button>
+    <span class="api-note">✓ Apps Script connected · Sheet recalculates on Apply</span>
+    <div class="cur-period">Active period: &nbsp;<b id="curPeriod">FY · FY26-27</b></div>
+  </div>
+
+  <!-- STATUS -->
+  <div class="status-bar sb-load" id="sb">
+    <span class="sdot"></span>
+    <span id="sbtxt" class="s-muted">Connecting…</span>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="kpis" id="kpis"></div>
+
+  <!-- CHARTS ROW 1 -->
+  <div class="charts-r1">
+    <div class="cc"><h3>RAG Status</h3><div class="cap">Branch count</div><div class="cbox"><canvas id="cRag"></canvas></div></div>
+    <div class="cc"><h3>Login Amount by Zone</h3><div class="cap">₹ Lakh</div><div class="cbox"><canvas id="cLogin"></canvas></div></div>
+    <div class="cc"><h3>Fresh Disbursement by Zone</h3><div class="cap">₹ Lakh</div><div class="cbox"><canvas id="cDisb"></canvas></div></div>
+    <div class="cc"><h3>L→D Conversion by Zone</h3><div class="cap">Average %</div><div class="cbox"><canvas id="cLtod"></canvas></div></div>
+  </div>
+
+  <!-- CHARTS ROW 2 -->
+  <div class="charts-r2">
+    <div class="cc"><h3>Top 10 Branches — Disbursement</h3><div class="cap">₹ Lakh</div><div class="cbox-tall"><canvas id="cTop10"></canvas></div></div>
+    <div class="cc"><h3>State-wise Disbursement</h3><div class="cap">₹ Lakh</div><div class="cbox-tall"><canvas id="cState"></canvas></div></div>
+  </div>
+
+  <!-- CHARTS ROW 3 -->
+  <div class="charts-r3">
+    <div class="cc"><h3>Cluster-wise Performance</h3><div class="cap">Login vs Disb ₹L</div><div class="cbox-tall"><canvas id="cCluster"></canvas></div></div>
+    <div class="cc"><h3>Active FOS vs Disbursement</h3><div class="cap">Each dot = one branch</div><div class="cbox-tall"><canvas id="cFOS"></canvas></div></div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="ctrls">
+    <div class="crow">
+      <div class="fl fgrow"><label>Search</label><input type="search" id="q" placeholder="Branch, cluster, region, state, DBM…"></div>
+      <div class="fl"><label>Zone</label><select id="fZone"><option value="">All zones</option></select></div>
+      <div class="fl"><label>Region</label><select id="fRegion"><option value="">All regions</option></select></div>
+      <div class="fl"><label>State</label><select id="fState"><option value="">All states</option></select></div>
+      <div class="fl"><label>Cluster</label><select id="fCluster"><option value="">All clusters</option></select></div>
+      <div class="fl"><label>Main Branch</label><select id="fMainBr"><option value="">All</option></select></div>
+      <div class="fl"><label>Team Type</label><select id="fTeam"><option value="">All</option></select></div>
+      <div class="fl"><label>DBM/DRM</label><select id="fDbm"><option value="">All</option></select></div>
+      <div class="fl"><label>Hub/Spoke</label><select id="fHub"><option value="">All</option></select></div>
+      <div class="fl"><label>Tier-2</label><select id="fTier"><option value="">All</option></select></div>
+      <div class="fl"><label>Reg. Branch</label><select id="fReg"><option value="">All</option></select></div>
+      <div class="fl"><label>Vintage Type</label><select id="fVint"><option value="">All</option></select></div>
+      <div class="fl"><label>Category</label><select id="fCat"><option value="">All</option></select></div>
+      <div class="fl"><label>RAG Status</label><select id="fRag"><option value="">All</option><option value="GREEN">Green</option><option value="AMBER">Amber</option><option value="RED">Red</option></select></div>
+      <div class="sp"></div>
+      <button class="bsm" id="btnExp">Expand all</button>
+      <button class="bsm" id="btnCol">Collapse all</button>
+    </div>
+    <div class="lgrow">
+      <span class="lg g"><span class="lsw"></span>Green (L→D ≥20%)</span>
+      <span class="lg a"><span class="lsw"></span>Amber (L→D 10–20%)</span>
+      <span class="lg r"><span class="lsw"></span>Red (L→D &lt;10%)</span>
+      <span class="lg"><span class="s-muted">Amounts ₹ Lakh · TAT days · Scroll table horizontally to see all columns</span></span>
+    </div>
+  </div>
+
+  <!-- SINGLE TABLE — ALL COLUMNS -->
+  <div class="tcard">
+    <div class="thead-bar">
+      <h2>Branch Detail — All Parameters</h2>
+      <span class="cnt" id="cnt"></span>
+      <div class="export-btns">
+        <button class="btn-exp" id="btnCsv">↓ CSV</button>
+        <button class="btn-exp" id="btnXlsx">↓ Excel</button>
+      </div>
+    </div>
+    <div class="tscroll">
+      <table>
+        <thead>
+          <tr>
+            <!-- LOCATION GROUP -->
+            <th class="l" data-col="branch">Branch</th>
+            <th class="l" data-col="zone">Zone</th>
+            <th class="l" data-col="region">Region</th>
+            <th class="l" data-col="state">State</th>
+            <th class="l" data-col="cluster">Cluster</th>
+            <th class="l" data-col="mainBr">Main Branch</th>
+            <th class="l" data-col="regBr">Reg. Branch</th>
+            <th class="l" data-col="hub">HUB</th>
+            <!-- STAFF GROUP -->
+            <th class="l grp-sep" data-col="vintType">Vintage Type</th>
+            <th class="l" data-col="category">Category</th>
+            <th class="l" data-col="teamType">Team Type</th>
+            <th class="l" data-col="dbm">DBM/DRM</th>
+            <th class="l" data-col="hubSpoke">Hub/Spoke</th>
+            <th class="l" data-col="tier2">Tier-2</th>
+            <th data-col="avgVin">Avg Vin<br><span style="font-size:9px;font-weight:400">days</span></th>
+            <th data-col="totalFOS">Total<br><span style="font-size:9px;font-weight:400">FOS</span></th>
+            <th data-col="activeFOS">Active<br><span style="font-size:9px;font-weight:400">FOS</span></th>
+            <!-- PERFORMANCE GROUP -->
+            <th class="grp-sep" data-col="loginAmt">Login<br><span style="font-size:9px;font-weight:400">₹L</span></th>
+            <th data-col="loginCnt">Login<br><span style="font-size:9px;font-weight:400">#</span></th>
+            <th data-col="disbAmt">Disb<br><span style="font-size:9px;font-weight:400">₹L</span></th>
+            <th data-col="disbCnt">Disb<br><span style="font-size:9px;font-weight:400">#</span></th>
+            <th data-col="overallDI">OA DI</th>
+            <th data-col="ltod">L→D<br><span style="font-size:9px;font-weight:400">%</span></th>
+            <!-- OPS GROUP -->
+            <th class="grp-sep" data-col="loginTAT">Login<br><span style="font-size:9px;font-weight:400">TAT d</span></th>
+            <th data-col="sanction">Sanction<br><span style="font-size:9px;font-weight:400">%</span></th>
+            <th data-col="disbTAT">Disb<br><span style="font-size:9px;font-weight:400">TAT d</span></th>
+            <th data-col="roi">ROI<br><span style="font-size:9px;font-weight:400">%</span></th>
+            <!-- RAG -->
+            <th class="grp-sep" data-col="rag">RAG</th>
+          </tr>
+        </thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    <b>Easy Home Finance Limited</b> · HR Operations · Branch Performance FY27<br>
+    Apps Script triggers sheet recalculation on period change · All parameters visible in single view
+  </footer>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════
+   APPS SCRIPT — wired and ready
+   ══════════════════════════════════════════════ */
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx6TkeEjfgcSGsMblgKjs96YtZjaYFjrZMDQSceK-vyl7nBR4N3BHg5I5U_l2y1RjWQOA/exec";
+
+/* Fallback CSV (used only if Apps Script fails) */
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQkF2ePgnit0o4laN6tTJerrfcvJgrb2ba8xz0j4lq4UZlc6Iw7aoFpCv5JH8LWEw/pub?gid=1352938143&single=true&output=csv";
+
+const PERIOD_OPTS = {
+  "Month"    :["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"],
+  "Quarter"  :["AMJ","JAS","OND","JFM"],
+  "Half Year":["H1","H2"],
+  "FY"       :["FY25-26","FY26-27"]
+};
+
+/* ── Column aliases ── */
+const COLS = {
+  branch   :["branch location","branch name","branch"],
+  zone     :["zone"],
+  state    :["state"],
+  region   :["region"],
+  mainBr   :["main branch"],
+  hub      :["hub"],
+  vintType :["vintage type"],
+  category :["category"],
+  teamType :["team type"],
+  dbm      :["dbm/drm","dbm","drm"],
+  hubSpoke :["hub/spoke"],
+  tier2    :["tier-2/megapolis","tier2","tier 2","megapolis"],
+  cluster  :["cluster"],
+  regBr    :["regulatory branch"],
+  loginAmt :["login amt","login amount"],
+  loginCnt :["login count","login #","logins"],
+  disbAmt  :["fresh disb amt","fresh disb amount","disb amt","disbursement amt"],
+  disbCnt  :["fresh disb count","fresh disb #","disb count"],
+  overallDI:["over all di","overall di","di"],
+  loginTAT :["login tat","login t.a.t","login tat (days)"],
+  sanction :["sanction %","sanction%","sanction pct","sanction"],
+  disbTAT  :["disb tat","disbursal tat","disb t.a.t"],
+  roi      :["roi","roi %"],
+  totalFOS :["total fos","fos"],
+  activeFOS:["active fos","fos active"],
+  avgVin   :["avg vintage","avg vin","average vintage","vintage (days)"],
+  ltod     :["l→d%","l→d conv%","l-d%","ltod%","l to d%","l>d%","lead to disb%","l→d","ltod"]
+};
+
+/* all cols in table order */
+const ALL_COLS = ["branch","zone","region","state","cluster","mainBr","regBr","hub",
+  "vintType","category","teamType","dbm","hubSpoke","tier2","avgVin","totalFOS","activeFOS",
+  "loginAmt","loginCnt","disbAmt","disbCnt","overallDI","ltod",
+  "loginTAT","sanction","disbTAT","roi","rag"];
+const STR_COLS = ["branch","zone","state","region","mainBr","hub","vintType","category",
+  "teamType","dbm","hubSpoke","tier2","cluster","regBr","rag"];
+const ZONE_ORD = ["South","West 1 (MH/MP/CG)","West 2 (GJ)","North"];
+
+/* ── Helpers ── */
+const $  = s=>document.querySelector(s);
+const $$ = s=>[...document.querySelectorAll(s)];
+const nr = v=>{const x=parseFloat(String(v??"").replace(/[,₹%\s]/g,""));return isNaN(x)?null:x;};
+const f0 = v=>v==null?"–":Math.round(v).toLocaleString("en-IN");
+const f1 = v=>v==null?"–":v.toLocaleString("en-IN",{minimumFractionDigits:1,maximumFractionDigits:1});
+const f2 = v=>v==null?"–":v.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+const norm= s=>String(s??"").toLowerCase().replace(/\s+/g," ").trim();
+const sum  =(list,f)=>list.reduce((a,d)=>a+(d[f]??0),0);
+const avg  =(list,f)=>{const v=list.map(d=>d[f]).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
+const uniq =(list,f)=>[...new Set(list.map(d=>d[f]).filter(Boolean))].sort();
+const zones=list=>{const s=uniq(list,"zone");s.sort((a,b)=>{const ia=ZONE_ORD.indexOf(a),ib=ZONE_ORD.indexOf(b);return(ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);});return s;};
+function rag(ltod){if(ltod==null)return"RED";if(ltod>=20)return"GREEN";if(ltod>=10)return"AMBER";return"RED";}
+function ragBadge(r){return `<span class="badge b${r[0]}">${r}</span>`;}
+function ragCls(r){return r==="GREEN"?"cG":r==="AMBER"?"cA":"cR";}
+
+/* ── State ── */
+let DATA=[], SORT={col:null,asc:true}, COL$={};
+let curType="FY", curVal="FY26-27";
+
+/* ── Period value dropdown ── */
+function buildPeriodValues(){
+  const t=$("#selType").value, sv=$("#selValue");
+  sv.innerHTML="";
+  (PERIOD_OPTS[t]||[]).forEach(v=>{const o=document.createElement("option");o.value=o.textContent=v;sv.appendChild(o);});
+  // default FY26-27 when FY selected
+  if(t==="FY") sv.value="FY26-27";
+}
+$("#selType").addEventListener("change",buildPeriodValues);
+buildPeriodValues();
+
+/* ── CSV parser ── */
+function parseCSV(txt){
+  const rows=[];let row=[],cell="",q=false;
+  for(let i=0;i<txt.length;i++){
+    const c=txt[i];
+    if(q){if(c==='"'){if(txt[i+1]==='"'){cell+='"';i++;}else q=false;}else cell+=c;}
+    else{if(c==='"')q=true;else if(c===','){row.push(cell.trim());cell="";}
+      else if(c==='\n'){row.push(cell.trim());if(row.some(x=>x))rows.push(row);row=[];cell="";}
+      else if(c!=='\r')cell+=c;}
+  }
+  if(cell||row.length){row.push(cell.trim());if(row.some(x=>x))rows.push(row);}
+  return rows;
+}
+
+function findHeaderRow(rows){
+  for(let i=0;i<Math.min(5,rows.length);i++){
+    if(rows[i].some(c=>/(branch|zone|login|disb)/i.test(c)))return i;
+  }
+  return 0;
+}
+
+function buildIdx(hdr){
+  const hn=hdr.map(norm);const idx={};
+  for(const key in COLS){for(const alias of COLS[key]){
+    const p=hn.findIndex(h=>h===norm(alias)||h.includes(norm(alias)));
+    if(p>-1){idx[key]=p;break;}
+  }}
+  return idx;
+}
+
+function makeRow(vals, idx){
+  const g=(k)=>idx[k]!=null?(vals[idx[k]]??"").toString().trim():"";
+  const ltodVal=nr(g("ltod"));
+  return {
+    branch:g("branch"),zone:g("zone"),state:g("state"),region:g("region"),
+    mainBr:g("mainBr"),hub:g("hub"),vintType:g("vintType"),category:g("category"),
+    teamType:g("teamType"),dbm:g("dbm"),hubSpoke:g("hubSpoke"),tier2:g("tier2"),
+    cluster:g("cluster"),regBr:g("regBr"),
+    loginAmt:nr(g("loginAmt")),loginCnt:nr(g("loginCnt")),
+    disbAmt:nr(g("disbAmt")),disbCnt:nr(g("disbCnt")),
+    overallDI:nr(g("overallDI")),loginTAT:nr(g("loginTAT")),
+    sanction:nr(g("sanction")),disbTAT:nr(g("disbTAT")),roi:nr(g("roi")),
+    totalFOS:nr(g("totalFOS")),activeFOS:nr(g("activeFOS")),avgVin:nr(g("avgVin")),
+    ltod:ltodVal,rag:rag(ltodVal)
+  };
+}
+
+function csvToData(rows){
+  if(!rows.length)return null;
+  const hi=findHeaderRow(rows);
+  const idx=buildIdx(rows[hi]);
+  if(idx.branch==null)return null;
+  const out=[];
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i];
+    const branch=(r[idx.branch??0]??"").toString().trim();
+    if(!branch||/^\s*(total|grand|filter)\s*$/i.test(branch))continue;
+    out.push(makeRow(r,idx));
+  }
+  return out;
+}
+
+function apiToData(apiResp){
+  if(!apiResp.rows||!apiResp.rows.length)return null;
+  // rows are objects keyed by header string
+  return apiResp.rows.map(rowObj=>{
+    // build a pseudo-idx and vals array from the object
+    const keys=Object.keys(rowObj);
+    const vals=keys.map(k=>rowObj[k]);
+    const idx=buildIdx(keys);
+    const branch=(vals[idx.branch??0]??"").toString().trim();
+    if(!branch||/^\s*(total|grand|filter)\s*$/i.test(branch))return null;
+    return makeRow(vals,idx);
+  }).filter(Boolean);
+}
+
+/* ── Filters ── */
+function buildFilters(){
+  [["fZone","zone","All zones"],["fRegion","region","All regions"],["fState","state","All states"],
+   ["fCluster","cluster","All clusters"],["fMainBr","mainBr","All"],["fTeam","teamType","All"],
+   ["fDbm","dbm","All"],["fHub","hubSpoke","All"],["fTier","tier2","All"],
+   ["fReg","regBr","All"],["fVint","vintType","All"],["fCat","category","All"]
+  ].forEach(([id,field,ph])=>{
+    const sel=$(("#"+id));const cur=sel.value;
+    sel.innerHTML=`<option value="">${ph}</option>`;
+    uniq(DATA,field).forEach(v=>{const o=document.createElement("option");o.value=o.textContent=v;sel.appendChild(o);});
+    if([...sel.options].some(o=>o.value===cur))sel.value=cur;
+  });
+}
+
+function filteredData(){
+  const q=$("#q").value.trim().toLowerCase();
+  const fz=$("#fZone").value,fr=$("#fRegion").value,fs=$("#fState").value,fc=$("#fCluster").value;
+  const fmb=$("#fMainBr").value,ftm=$("#fTeam").value,fdb=$("#fDbm").value,fhb=$("#fHub").value;
+  const ftr=$("#fTier").value,frg=$("#fReg").value,fv=$("#fVint").value,fcat=$("#fCat").value,frag=$("#fRag").value;
+  return DATA.filter(d=>
+    (!q||[d.branch,d.zone,d.state,d.region,d.cluster,d.regBr,d.dbm,d.mainBr,d.teamType].some(v=>(v||"").toLowerCase().includes(q)))&&
+    (!fz||d.zone===fz)&&(!fr||d.region===fr)&&(!fs||d.state===fs)&&(!fc||d.cluster===fc)&&
+    (!fmb||d.mainBr===fmb)&&(!ftm||d.teamType===ftm)&&(!fdb||d.dbm===fdb)&&(!fhb||d.hubSpoke===fhb)&&
+    (!ftr||d.tier2===ftr)&&(!frg||d.regBr===frg)&&(!fv||d.vintType===fv)&&(!fcat||d.category===fcat)&&(!frag||d.rag===frag)
+  );
+}
+
+/* ── KPIs ── */
+function renderKPIs(){
+  const G=DATA.filter(d=>d.rag==="GREEN").length;
+  const A=DATA.filter(d=>d.rag==="AMBER").length;
+  const R=DATA.filter(d=>d.rag==="RED").length;
+  const pct=n=>DATA.length?((n/DATA.length)*100).toFixed(0)+"%":"0%";
+  const cards=[
+    {l:"Branches",   v:DATA.length,               s:zones(DATA).length+" zones",   c:"kr"},
+    {l:"Login Amt",  v:"₹"+f0(sum(DATA,"loginAmt")),s:"₹ Lakh",                   c:"kb"},
+    {l:"Fresh Disb", v:"₹"+f0(sum(DATA,"disbAmt")), s:"₹ Lakh",                   c:"kb"},
+    {l:"Avg L→D",    v:f1(avg(DATA,"ltod"))+"%",    s:"Conversion avg",            c:"kg"},
+    {l:"Total FOS",  v:f0(sum(DATA,"totalFOS")),    s:"Field officers",            c:"kp"},
+    {l:"Active FOS", v:f0(sum(DATA,"activeFOS")),   s:"Active in period",          c:"kp"},
+    {l:"Avg ROI",    v:f2(avg(DATA,"roi"))+"%",     s:"Return on investment",      c:"ko"},
+    {l:"Avg Vintage",v:f0(avg(DATA,"avgVin"))+"d",  s:"Days average",              c:"kr"},
+    {l:"🟢 Green",   v:G,                           s:pct(G)+" of branches",       c:"kg"},
+    {l:"🟡 Amber",   v:A,                           s:pct(A)+" of branches",       c:"ka"},
+    {l:"🔴 Red",     v:R,                           s:pct(R)+" of branches",       c:"kr"},
+    {l:"Login TAT",  v:f1(avg(DATA,"loginTAT"))+"d",s:"Avg days",                 c:"ka"},
+  ];
+  $("#kpis").innerHTML=cards.map(c=>`<div class="kpi ${c.c}"><div class="klbl">${c.l}</div><div class="kval">${c.v}</div><div class="ksub">${c.s}</div></div>`).join("");
+}
+
+/* ── Charts ── */
+let charts={};
+function renderCharts(){
+  const zs=zones(DATA);
+  const tc={color:"#6b7280",font:{family:"Calibri,Segoe UI,sans-serif",size:11}};
+  const grid={color:"#eef0f3"};
+  const shortZ=z=>z.replace("West 1 (MH/MP/CG)","W1 MH").replace("West 2 (GJ)","W2 GJ");
+  Object.values(charts).forEach(c=>c?.destroy());
+
+  const G=DATA.filter(d=>d.rag==="GREEN").length;
+  const A=DATA.filter(d=>d.rag==="AMBER").length;
+  const R=DATA.filter(d=>d.rag==="RED").length;
+
+  charts.rag=new Chart($("#cRag"),{type:"doughnut",
+    data:{labels:["Green","Amber","Red"],datasets:[{data:[G,A,R],backgroundColor:["#16803c","#d97706","#dc2626"],borderColor:"#fff",borderWidth:2}]},
+    options:{cutout:"62%",maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{color:"#1a1a1c",font:{family:"Calibri,Segoe UI",size:11},boxWidth:9,padding:8}}}}});
+
+  charts.login=new Chart($("#cLogin"),{type:"bar",
+    data:{labels:zs.map(shortZ),datasets:[{data:zs.map(z=>sum(DATA.filter(d=>d.zone===z),"loginAmt")),backgroundColor:"#1a73e8",borderRadius:4,maxBarThickness:38}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:tc},y:{grid,ticks:{...tc,callback:v=>"₹"+v.toLocaleString("en-IN")}}}}});
+
+  charts.disb=new Chart($("#cDisb"),{type:"bar",
+    data:{labels:zs.map(shortZ),datasets:[{data:zs.map(z=>sum(DATA.filter(d=>d.zone===z),"disbAmt")),backgroundColor:"#FF1616",borderRadius:4,maxBarThickness:38}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:tc},y:{grid,ticks:{...tc,callback:v=>"₹"+v.toLocaleString("en-IN")}}}}});
+
+  charts.ltod=new Chart($("#cLtod"),{type:"bar",
+    data:{labels:zs.map(shortZ),datasets:[{data:zs.map(z=>avg(DATA.filter(d=>d.zone===z),"ltod")),backgroundColor:"#7c3aed",borderRadius:4,maxBarThickness:38}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:tc},y:{grid,ticks:{...tc,callback:v=>(v||0).toFixed(1)+"%"},beginAtZero:true}}}});
+
+  const top10=[...DATA].filter(d=>d.disbAmt>0).sort((a,b)=>(b.disbAmt||0)-(a.disbAmt||0)).slice(0,10);
+  charts.top10=new Chart($("#cTop10"),{type:"bar",
+    data:{labels:top10.map(d=>d.branch),datasets:[{data:top10.map(d=>d.disbAmt),backgroundColor:"#0891b2",borderRadius:4}]},
+    options:{indexAxis:"y",maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid,ticks:{...tc,callback:v=>"₹"+v}},y:{grid:{display:false},ticks:{...tc,font:{size:10}}}}}});
+
+  const stateDisb=uniq(DATA,"state").map(s=>({s,v:sum(DATA.filter(d=>d.state===s),"disbAmt")})).sort((a,b)=>b.v-a.v).slice(0,12);
+  charts.state=new Chart($("#cState"),{type:"bar",
+    data:{labels:stateDisb.map(x=>x.s),datasets:[{data:stateDisb.map(x=>x.v),backgroundColor:"#f59e0b",borderRadius:4}]},
+    options:{indexAxis:"y",maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid,ticks:{...tc,callback:v=>"₹"+v}},y:{grid:{display:false},ticks:{...tc,font:{size:10}}}}}});
+
+  const clusters=uniq(DATA,"cluster").filter(Boolean);
+  charts.cluster=new Chart($("#cCluster"),{type:"bar",
+    data:{labels:clusters,datasets:[
+      {label:"Login ₹L",data:clusters.map(c=>sum(DATA.filter(d=>d.cluster===c),"loginAmt")),backgroundColor:"#1a73e8",borderRadius:3,maxBarThickness:18},
+      {label:"Disb ₹L", data:clusters.map(c=>sum(DATA.filter(d=>d.cluster===c),"disbAmt")), backgroundColor:"#FF1616",borderRadius:3,maxBarThickness:18}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{position:"top",labels:{font:{family:"Calibri,Segoe UI",size:10},boxWidth:9}}},
+      scales:{x:{grid:{display:false},ticks:{...tc,font:{size:9}}},y:{grid,ticks:{...tc,callback:v=>"₹"+v}}}}});
+
+  const pts=DATA.filter(d=>d.activeFOS!=null&&d.disbAmt!=null).map(d=>({x:d.activeFOS,y:d.disbAmt,label:d.branch}));
+  charts.fos=new Chart($("#cFOS"),{type:"scatter",
+    data:{datasets:[{data:pts,backgroundColor:"rgba(124,58,237,.55)",pointRadius:5,pointHoverRadius:7}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:d=>`${d.raw.label}: FOS ${d.raw.x} | Disb ₹${d.raw.y}`}}},
+      scales:{x:{title:{display:true,text:"Active FOS",font:{size:10}},grid,ticks:tc},y:{title:{display:true,text:"Disb ₹L",font:{size:10}},grid,ticks:tc}}}});
+}
+
+/* ── Cell value ── */
+function cellVal(d,col){
+  switch(col){
+    case "loginAmt": return f0(d.loginAmt);
+    case "loginCnt": return f0(d.loginCnt);
+    case "disbAmt":  return f0(d.disbAmt);
+    case "disbCnt":  return f0(d.disbCnt);
+    case "overallDI":return f1(d.overallDI);
+    case "ltod":     return f1(d.ltod);
+    case "loginTAT": return f1(d.loginTAT);
+    case "sanction": return f1(d.sanction);
+    case "disbTAT":  return f1(d.disbTAT);
+    case "roi":      return f2(d.roi);
+    case "totalFOS": return f0(d.totalFOS);
+    case "activeFOS":return f0(d.activeFOS);
+    case "avgVin":   return f0(d.avgVin);
+    case "rag":      return ragBadge(d.rag);
+    default: return d[col]??"";
+  }
+}
+function cellCls(d,col){ return col==="ltod"?ragCls(d.rag):""; }
+function aggVal(list,col){
+  if(STR_COLS.includes(col)) return "";
+  switch(col){
+    case "loginAmt": return f0(sum(list,"loginAmt"));
+    case "loginCnt": return f0(sum(list,"loginCnt"));
+    case "disbAmt":  return f0(sum(list,"disbAmt"));
+    case "disbCnt":  return f0(sum(list,"disbCnt"));
+    case "overallDI":return f1(avg(list,"overallDI"));
+    case "ltod":     return f1(avg(list,"ltod"));
+    case "loginTAT": return f1(avg(list,"loginTAT"));
+    case "sanction": return f1(avg(list,"sanction"));
+    case "disbTAT":  return f1(avg(list,"disbTAT"));
+    case "roi":      return f2(avg(list,"roi"));
+    case "totalFOS": return f0(sum(list,"totalFOS"));
+    case "activeFOS":return f0(sum(list,"activeFOS"));
+    case "avgVin":   return f0(avg(list,"avgVin"));
+    default: return "";
+  }
+}
+
+/* ── Render table ── */
+function renderTable(){
+  let list=filteredData();
+  if(SORT.col){
+    const sk=SORT.col;
+    list=[...list].sort((a,b)=>{
+      let av=a[sk]??"",bv=b[sk]??"";
+      if(typeof av!=="string"||typeof bv!=="string"){av=av??-Infinity;bv=bv??-Infinity;}
+      return SORT.asc?(av>bv?1:av<bv?-1:0):(av<bv?1:av>bv?-1:0);
+    });
+  }
+
+  // re-attach sort listeners
+  $$("thead th[data-col]").forEach(th=>{
+    th.classList.remove("sa","sd");
+    if(SORT.col===th.dataset.col) th.classList.add(SORT.asc?"sa":"sd");
+    th.onclick=()=>{
+      const c=th.dataset.col;
+      SORT.col===c?SORT.asc=!SORT.asc:(SORT.col=c,SORT.asc=true);
+      renderTable();
+    };
+  });
+
+  const tbody=$("#tb"); tbody.innerHTML="";
+  const zs=zones(list);
+
+  zs.forEach(z=>{
+    const rows=list.filter(d=>d.zone===z);
+    const G=rows.filter(d=>d.rag==="GREEN").length;
+    const A=rows.filter(d=>d.rag==="AMBER").length;
+    const R=rows.filter(d=>d.rag==="RED").length;
+    const T=G+A+R||1;
+    const isCol=!!COL$[z];
+
+    const zr=document.createElement("tr"); zr.className="zr"+(isCol?" col":""); zr.dataset.z=z;
+    zr.innerHTML=`<td class="l" colspan="${ALL_COLS.length}"><div class="zh">
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      <span class="zn">${z}</span><span class="zbr">${rows.length} branches</span>
+      <span class="rib"><span class="rg" style="width:${100*G/T}%"></span><span class="ra" style="width:${100*A/T}%"></span><span class="rr" style="width:${100*R/T}%"></span></span>
+      <span class="zmix"><b>${G}</b> G · <b>${A}</b> A · <b>${R}</b> R</span>
+    </div></td>`;
+    zr.addEventListener("click",()=>{COL$[z]=!COL$[z];renderTable();});
+    tbody.appendChild(zr);
+
+    if(!isCol){
+      rows.forEach(d=>{
+        const tr=document.createElement("tr");
+        tr.innerHTML=ALL_COLS.map((c,i)=>{
+          const grp=["vintType","loginAmt","loginTAT","rag"].includes(c)?" grp-sep":"";
+          const isL=STR_COLS.includes(c)&&c!=="rag";
+          return `<td class="${isL?"l":""}${grp} ${cellCls(d,c)}">${cellVal(d,c)}</td>`;
+        }).join("");
+        tbody.appendChild(tr);
+      });
+      // zone total
+      const zt=document.createElement("tr"); zt.className="zt";
+      zt.innerHTML=ALL_COLS.map((c,i)=>{
+        if(i===0) return `<td class="l">${z} — Total (${rows.length})</td>`;
+        const grp=["vintType","loginAmt","loginTAT","rag"].includes(c)?" grp-sep":"";
+        return `<td class="${grp}">${aggVal(rows,c)}</td>`;
+      }).join("");
+      tbody.appendChild(zt);
+    }
+  });
+
+  if(!zs.length){
+    tbody.innerHTML=`<tr><td colspan="${ALL_COLS.length}" class="empty">No branches match the current filters.</td></tr>`;
+  } else {
+    const gr=document.createElement("tr"); gr.className="grand";
+    gr.innerHTML=ALL_COLS.map((c,i)=>{
+      if(i===0) return `<td class="l">Grand Total — ${zs.length} zone${zs.length>1?"s":""} · ${list.length} branches</td>`;
+      return `<td>${aggVal(list,c)}</td>`;
+    }).join("");
+    tbody.appendChild(gr);
+  }
+  $("#cnt").textContent=`${list.length} of ${DATA.length} branches`;
+}
+
+/* ── Export ── */
+const HDR_LABELS = {
+  branch:"Branch",zone:"Zone",region:"Region",state:"State",cluster:"Cluster",
+  mainBr:"Main Branch",regBr:"Reg Branch",hub:"HUB",vintType:"Vintage Type",
+  category:"Category",teamType:"Team Type",dbm:"DBM/DRM",hubSpoke:"Hub/Spoke",
+  tier2:"Tier-2",avgVin:"Avg Vintage",totalFOS:"Total FOS",activeFOS:"Active FOS",
+  loginAmt:"Login ₹L",loginCnt:"Login #",disbAmt:"Disb ₹L",disbCnt:"Disb #",
+  overallDI:"OA DI",ltod:"L→D %",loginTAT:"Login TAT",sanction:"Sanction %",
+  disbTAT:"Disb TAT",roi:"ROI %",rag:"RAG"
+};
+function exportData(sep,ext,mime){
+  const list=filteredData();
+  const hdr=ALL_COLS.map(c=>HDR_LABELS[c]||c).join(sep);
+  const rows=list.map(d=>ALL_COLS.map(c=>cellVal(d,c).replace(/<[^>]+>/g,"")).join(sep));
+  const blob=new Blob([[hdr,...rows].join("\n")],{type:mime});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=`EHFL_Branch_${curType}_${curVal}.${ext}`; a.click();
+}
+
+/* ── Status / stamp ── */
+function setSB(kind,html){const sb=$("#sb");sb.className="status-bar sb-"+kind;$("#sbtxt").innerHTML=html;}
+function stamp(){$("#asof").textContent=new Date().toLocaleString("en-IN",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});}
+function setPeriod(t,v){
+  curType=t; curVal=v;
+  $("#periodPill").textContent=`${t}: ${v}`;
+  $("#curPeriod").textContent=`${t} · ${v}`;
+}
+
+/* ── Boot ── */
+function boot(list,src,t,v){
+  DATA=list; COL$={}; stamp(); setPeriod(t,v);
+  buildFilters(); renderKPIs(); renderCharts(); renderTable();
+  setSB("live",src==="api"
+    ? `✓ Apps Script · <b>${DATA.length} branches</b> · Period: <b>${t} / ${v}</b> · Sheet recalculated`
+    : `✓ CSV · <b>${DATA.length} branches</b> · Period reflects current M1/P1 in sheet`);
+}
+
+/* ── Load via Apps Script ── */
+async function loadViaAPI(filterType,filterValue){
+  setSB("load",`Updating sheet → ${filterType}: ${filterValue} · waiting for recalculation (5s)…`);
+  $("#ovTxt").textContent=`Setting ${filterType}: ${filterValue} in sheet…`;
+  $("#overlay").classList.remove("hidden");
+  const res=await fetch(APPS_SCRIPT_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({filterType,filterValue})
+  });
+  if(!res.ok) throw new Error("Apps Script HTTP "+res.status);
+  const json=await res.json();
+  if(json.error) throw new Error(json.error);
+  const objs=apiToData(json);
+  if(!objs||!objs.length) throw new Error("No branch rows in API response");
+  return objs;
+}
+
+/* ── Load via CSV ── */
+async function loadViaCSV(){
+  setSB("load","Fetching from published CSV…");
+  const res=await fetch(CSV_URL,{cache:"no-store"});
+  if(!res.ok) throw new Error("HTTP "+res.status);
+  const txt=await res.text();
+  if(txt.trim().startsWith("<!")) throw new Error("Sheet returned HTML — check publish settings");
+  const rows=parseCSV(txt);
+  const objs=csvToData(rows);
+  if(!objs||!objs.length) throw new Error("No branch rows found");
+  return objs;
+}
+
+/* ── Apply button ── */
+async function applyPeriod(){
+  const t=$("#selType").value, v=$("#selValue").value;
+  if(!v){alert("Please select a period value.");return;}
+  $("#btnApply").disabled=true; $("#btnRef").disabled=true;
+  try{
+    const objs=await loadViaAPI(t,v);
+    boot(objs,"api",t,v);
+  }catch(e){
+    // fallback to CSV
+    try{
+      const objs=await loadViaCSV();
+      boot(objs,"csv",t,v);
+      setSB("live",`⚠ Apps Script error (${e.message}) — showing CSV data. Period may not reflect selection.`);
+    }catch(e2){
+      setSB("err",`⚠ Both API and CSV failed: ${e2.message}`);
+    }
+  }finally{
+    $("#btnApply").disabled=false; $("#btnRef").disabled=false;
+    $("#overlay").classList.add("hidden");
+  }
+}
+
+/* ── Initial load ── */
+async function load(){
+  $("#btnRef").disabled=true;
+  try{
+    // try API first with default FY/FY26-27, fall back to CSV
+    let objs;
+    try{
+      objs=await loadViaAPI("FY","FY26-27");
+      boot(objs,"api","FY","FY26-27");
+    }catch(e){
+      objs=await loadViaCSV();
+      boot(objs,"csv","FY","FY26-27");
+    }
+  }catch(e){
+    setSB("err",`⚠ ${e.message}`);
+  }finally{
+    $("#btnRef").disabled=false;
+    $("#overlay").classList.add("hidden");
+  }
+}
+
+/* ── Events ── */
+["q","fZone","fRegion","fState","fCluster","fMainBr","fTeam","fDbm",
+ "fHub","fTier","fReg","fVint","fCat","fRag"].forEach(id=>{
+  $(("#"+id)).addEventListener("input",renderTable);
+});
+$("#btnApply").addEventListener("click",applyPeriod);
+$("#btnRef").addEventListener("click",load);
+$("#btnExp").addEventListener("click",()=>{COL$={};renderTable();});
+$("#btnCol").addEventListener("click",()=>{zones(DATA).forEach(z=>COL$[z]=true);renderTable();});
+$("#btnCsv").addEventListener("click",()=>exportData(",","csv","text/csv"));
+$("#btnXlsx").addEventListener("click",()=>exportData("\t","xls","application/vnd.ms-excel"));
+
+load();
+</script>
+</body>
+</html>
