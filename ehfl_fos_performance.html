@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EHFL · FOS Recruitment Dashboard · Budget vs Gap</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --red:#FF1616;--red-d:#C60E0E;
+  --ink:#1a1a1c;--sub:#6b7280;
+  --line:#e5e7eb;--soft:#f3f4f6;--card:#fff;--bg:#f5f6f8;
+  --g:#16803c;--g-bg:#dcfce7;--g-bd:#bbf7d0;
+  --a:#b45309;--a-bg:#fef3c7;--a-bd:#fde68a;
+  --r:#dc2626;--r-bg:#fee2e2;--r-bd:#fca5a5;
+  --sh:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.07);
+  --rad:10px;
+  --ff:"Calibri","Segoe UI",system-ui,Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--ff);background:var(--bg);color:var(--ink);font-size:13px;-webkit-font-smoothing:antialiased}
+
+/* ── TOPBAR ── */
+.bar{background:linear-gradient(115deg,#b80e0e 0%,var(--red) 60%,#ff4444 100%);color:#fff;position:relative;overflow:hidden}
+.bar::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.06);clip-path:polygon(62% 0,100% 0,100% 100%,70% 100%)}
+.bar-in{max-width:1600px;margin:0 auto;padding:13px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:relative;z-index:1}
+.logo{width:38px;height:38px;border-radius:8px;background:#fff;color:var(--red);display:grid;place-items:center;font-weight:800;font-size:16px;flex:none;box-shadow:0 2px 8px rgba(0,0,0,.22)}
+.btext h1{font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.btext p{font-size:11.5px;opacity:.88;margin-top:1px}
+.bright{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pill{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.32);padding:4px 12px;border-radius:99px;font-size:11.5px;font-weight:600}
+.period-pill{background:rgba(255,255,255,.25);border:1px solid rgba(255,255,255,.5);padding:4px 14px;border-radius:99px;font-size:12px;font-weight:700}
+.asof{font-size:11px;opacity:.9;text-align:right;line-height:1.5}
+.asof b{font-weight:700}
+.btn{border:none;cursor:pointer;font-family:var(--ff);font-weight:600;font-size:12px;padding:7px 13px;border-radius:7px;display:inline-flex;align-items:center;gap:6px;transition:.15s}
+.btn-w{background:#fff;color:var(--red);box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.btn-w:hover{transform:translateY(-1px)}
+.btn-w:disabled{opacity:.55;cursor:wait;transform:none}
+.barsub{max-width:1600px;margin:0 auto;padding:5px 20px;font-size:11px;color:rgba(255,255,255,.88);border-top:1px solid rgba(255,255,255,.14);position:relative;z-index:1}
+
+/* ── SITE NAV ── */
+.sitenav{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:100;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.sitenav-in{max-width:1600px;margin:0 auto;padding:0 20px;display:flex;align-items:center;gap:2px}
+.navlink{display:inline-flex;align-items:center;gap:6px;padding:10px 14px;font-size:12.5px;font-weight:600;color:var(--sub);text-decoration:none;border-bottom:2px solid transparent;transition:.15s;white-space:nowrap}
+.navlink:hover{color:var(--ink);border-bottom-color:var(--line)}
+.navlink.active{color:var(--red);border-bottom-color:var(--red)}
+.navlink svg{flex:none;opacity:.75}
+.navlink.active svg{opacity:1}
+
+/* ── WRAP ── */
+.wrap{max-width:1600px;margin:0 auto;padding:12px 20px 56px}
+
+/* ── STATUS ── */
+.status-bar{display:flex;align-items:center;gap:8px;padding:8px 13px;border-radius:8px;border:1px solid var(--line);background:var(--card);font-size:12px;margin-bottom:10px}
+.sdot{width:8px;height:8px;border-radius:50%;flex:none}
+.sb-live .sdot{background:var(--g);box-shadow:0 0 0 3px var(--g-bg)}
+.sb-load .sdot{background:#f59e0b;box-shadow:0 0 0 3px #fef3c7;animation:pulse 1s infinite}
+.sb-err  .sdot{background:var(--r);box-shadow:0 0 0 3px var(--r-bg)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.s-muted{color:var(--sub)}
+
+/* ── KPI CARDS ── */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:10px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--rad);padding:11px 13px;box-shadow:var(--sh);position:relative;overflow:hidden}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+.kpi.kr::before{background:var(--red)}  .kpi.kg::before{background:var(--g)}
+.kpi.ka::before{background:var(--a)}    .kpi.kb::before{background:#1a73e8}
+.kpi.ko::before{background:#7c3aed}     .kpi.kp::before{background:#0891b2}
+.klbl{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+.kval{font-size:20px;font-weight:800;margin-top:3px;line-height:1;letter-spacing:-.01em}
+.ksub{font-size:10px;color:var(--sub);margin-top:3px}
+
+/* ── CHARTS ── */
+.charts-r1{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:9px}
+.charts-r2{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:10px}
+.cc{background:var(--card);border:1px solid var(--line);border-radius:var(--rad);padding:11px 13px;box-shadow:var(--sh)}
+.cc h3{font-size:12px;font-weight:700;margin-bottom:1px}
+.cc .cap{font-size:10px;color:var(--sub);margin-bottom:6px}
+.cbox{position:relative;height:220px}
+.cbox-tall{position:relative;height:280px}
+
+/* ── FILTER PANEL ── */
+.ctrls{background:var(--card);border:1px solid var(--line);border-radius:var(--rad);box-shadow:var(--sh);margin-bottom:10px}
+.crow{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;padding:10px 12px}
+.fl{display:flex;flex-direction:column;gap:3px}
+.fl label{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+select,input[type=search]{font-family:var(--ff);font-size:12.5px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:7px;padding:7px 10px;outline:none;transition:.14s}
+select:focus,input[type=search]:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(255,22,22,.1)}
+.fgrow{flex:1 1 160px}.fgrow input{width:100%}
+.sp{flex:1}
+
+/* ── TABLE ── */
+.tcard{background:var(--card);border:1px solid var(--line);border-radius:var(--rad);box-shadow:var(--sh);overflow:hidden}
+.thead-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.thead-bar h2{font-size:13px;font-weight:700}
+.cnt{font-size:11.5px;color:var(--sub)}
+.tscroll{overflow-x:auto;max-height:65vh;overflow-y:auto}
+table{border-collapse:collapse;width:100%;font-size:11.5px}
+thead th{position:sticky;top:0;z-index:4;background:#f8f9fa;color:var(--sub);font-weight:700;
+  text-transform:uppercase;letter-spacing:.03em;font-size:10px;padding:8px 7px;
+  text-align:right;border-bottom:2px solid var(--line);white-space:nowrap;
+  cursor:pointer;user-select:none;border-right:1px solid var(--soft)}
+thead th.l{text-align:left}
+thead th:hover{color:var(--ink);background:#f0f1f3}
+thead th.sa::after{content:" ▲";font-size:8px}
+thead th.sd::after{content:" ▼";font-size:8px}
+thead th.grp-sep{border-left:2px solid var(--line)}
+tbody td{padding:6px 7px;text-align:right;border-bottom:1px solid var(--soft);white-space:nowrap;border-right:1px solid rgba(229,231,235,.4)}
+tbody td.l{text-align:left}
+tbody td.grp-sep{border-left:2px solid var(--line)}
+tr:hover td{background:#fafbfc}
+
+/* zone rows */
+tr.zr td{background:#f1f2f5;border-bottom:1px solid var(--line);padding:8px 7px;cursor:pointer}
+tr.zr:hover td{background:#eaebee}
+.zh{display:flex;align-items:center;gap:8px}
+.chev{width:13px;height:13px;flex:none;transition:transform .16s;color:var(--sub)}
+tr.zr.col .chev{transform:rotate(-90deg)}
+.zn{font-weight:800;font-size:12px}
+.zbr{font-size:11px;color:var(--sub)}
+.rib{display:flex;height:6px;width:80px;border-radius:3px;overflow:hidden;border:1px solid var(--line);flex:none}
+.rib span{display:block;height:100%}
+.rg{background:var(--g)}.ra{background:var(--a)}.rr{background:var(--r)}
+.zmix{font-size:11px;color:var(--sub)}
+.zmix b{color:var(--ink)}
+tr.zt td{font-weight:700;background:#ebebee;border-top:1px solid var(--line);border-bottom:2px solid var(--line);font-size:11.5px}
+tr.grand td{font-weight:700;background:var(--ink);color:#fff;padding:9px 7px;border:none;font-size:12px}
+
+/* badges */
+.badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;border:1px solid;display:inline-block}
+.bG{color:var(--g);background:var(--g-bg);border-color:var(--g-bd)}
+.bA{color:var(--a);background:var(--a-bg);border-color:var(--a-bd)}
+.bR{color:var(--r);background:var(--r-bg);border-color:var(--r-bd)}
+td.cG{color:var(--g);font-weight:700}
+td.cA{color:var(--a);font-weight:700}
+td.cR{color:var(--r);font-weight:700}
+
+.empty{padding:40px;text-align:center;color:var(--sub)}
+footer{text-align:center;font-size:11px;color:var(--sub);margin-top:14px;line-height:1.9}
+
+/* LOADING OVERLAY */
+#overlay{position:fixed;inset:0;background:rgba(255,255,255,.92);display:grid;place-items:center;z-index:999;transition:opacity .3s}
+#overlay.hidden{opacity:0;pointer-events:none}
+.spinner{width:38px;height:38px;border:4px solid var(--line);border-top-color:var(--red);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ov-txt{font-size:13px;color:var(--sub);text-align:center}
+
+@media(max-width:1200px){.kpis{grid-template-columns:repeat(2,1fr)}.charts-r1{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="overlay">
+  <div><div class="spinner"></div><div class="ov-txt" id="ovTxt">Loading Recruitment Data…</div></div>
+</div>
+
+<!-- TOPBAR -->
+<div class="bar">
+  <div class="bar-in">
+    <div class="logo">EH</div>
+    <div class="btext">
+      <h1>Easy Home Finance Limited</h1>
+      <p>FOS Recruitment Dashboard · Budget vs Gap Analysis</p>
+    </div>
+    <div class="bright">
+      <span class="pill">Live Data</span>
+      <span class="period-pill">Sheet 2</span>
+      <div class="asof">Last refreshed<br><b id="asof">—</b></div>
+      <button class="btn btn-w" id="btnRef">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+  <div class="barsub">
+    GREEN = Gap ≤ 2 &nbsp;|&nbsp; AMBER = Gap 3–5 &nbsp;|&nbsp; RED = Gap &gt; 5
+    &nbsp;·&nbsp; Live data fetched from Google Sheets (Sheet 2)
+  </div>
+</div>
+
+<!-- SITE NAV -->
+<nav class="sitenav">
+  <div class="sitenav-in">
+    <a href="index.html" class="navlink">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      HR Dashboard
+    </a>
+    <a href="fy27_dashboard.html" class="navlink">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      FY27 Dashboard
+    </a>
+    <a href="ehfl_fos_performance.html" class="navlink active">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+      Recruitment Dashboard
+    </a>
+    <a href="fy27_Branch_Scorecard.html" class="navlink">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Branch Performance
+    </a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <!-- STATUS -->
+  <div class="status-bar sb-load" id="sb">
+    <span class="sdot"></span>
+    <span id="sbtxt" class="s-muted">Connecting to Sheet 2…</span>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="kpis" id="kpis"></div>
+
+  <!-- CHARTS ROW 1 -->
+  <div class="charts-r1">
+    <div class="cc"><h3>Budget vs Filled vs Gap</h3><div class="cap">FOS Count</div><div class="cbox"><canvas id="cBvg"></canvas></div></div>
+    <div class="cc"><h3>Zone-wise Gap Analysis</h3><div class="cap">Open Positions</div><div class="cbox"><canvas id="cZoneGap"></canvas></div></div>
+    <div class="cc"><h3>Recruitment Status Mix</h3><div class="cap">Branch Count</div><div class="cbox"><canvas id="cStatusMix"></canvas></div></div>
+  </div>
+
+  <!-- CHARTS ROW 2 -->
+  <div class="charts-r2">
+    <div class="cc"><h3>Top 10 Branches — Highest Gap</h3><div class="cap">FOS Needed</div><div class="cbox-tall"><canvas id="cTopGap"></canvas></div></div>
+    <div class="cc"><h3>Cluster-wise Filling %</h3><div class="cap">Budget vs Actual</div><div class="cbox-tall"><canvas id="cClusterPct"></canvas></div></div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="ctrls">
+    <div class="crow">
+      <div class="fl fgrow"><label>Search</label><input type="search" id="q" placeholder="Branch, cluster, region, state, DBM…"></div>
+      <div class="fl"><label>Zone</label><select id="fZone"><option value="">All zones</option></select></div>
+      <div class="fl"><label>Region</label><select id="fRegion"><option value="">All regions</option></select></div>
+      <div class="fl"><label>State</label><select id="fState"><option value="">All states</option></select></div>
+      <div class="fl"><label>Cluster</label><select id="fCluster"><option value="">All clusters</option></select></div>
+      <div class="fl"><label>Status</label><select id="fRag"><option value="">All</option><option value="GREEN">Green</option><option value="AMBER">Amber</option><option value="RED">Red</option></select></div>
+      <div class="sp"></div>
+    </div>
+  </div>
+
+  <!-- SINGLE TABLE — ALL COLUMNS -->
+  <div class="tcard">
+    <div class="thead-bar">
+      <h2>Branch Detail — Budget vs Gap</h2>
+      <span class="cnt" id="cnt"></span>
+    </div>
+    <div class="tscroll">
+      <table>
+        <thead>
+          <tr>
+            <th class="l" data-col="branch">Branch</th>
+            <th class="l" data-col="zone">Zone</th>
+            <th class="l" data-col="region">Region</th>
+            <th class="l" data-col="state">State</th>
+            <th class="l" data-col="cluster">Cluster</th>
+            <th class="l" data-col="dbm">DBM/DRM</th>
+            <th class="grp-sep" data-col="budgetFOS">Budget<br><span style="font-size:9px;font-weight:400">FOS</span></th>
+            <th data-col="activeFOS">Active<br><span style="font-size:9px;font-weight:400">FOS</span></th>
+            <th data-col="gap">Gap</th>
+            <th data-col="fillPct">Fill %</th>
+            <th class="grp-sep" data-col="rag">Status</th>
+          </tr>
+        </thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    <b>Easy Home Finance Limited</b> · HR Operations · FOS Recruitment Tracking<br>
+    Data fetched live from Google Sheets (Sheet 2)
+  </footer>
+</div>
+
+<script>
+/* In your provided sheet link, if sheet 2 has a different gid, replace gid=0 below with the correct gid */
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTpSAEEx767RPRGXfolzmMxAbHSejhFnUUdBD3PQS2D3yvKxQTnchxw2aCLqOgRcMsi9p9KmxM3E4kg/pub?gid=0&single=true&output=csv";
+
+const COLS = {
+  branch   :["branch location","branch name","branch"],
+  zone     :["zone"],
+  state    :["state"],
+  region   :["region"],
+  cluster  :["cluster"],
+  dbm      :["dbm/drm","dbm","drm"],
+  budgetFOS:["budget fos","budgetted fos","budget"],
+  activeFOS:["active fos","current fos","filled fos","fos active"],
+  gap      :["gap","open positions"],
+};
+
+const ALL_COLS = ["branch","zone","region","state","cluster","dbm","budgetFOS","activeFOS","gap","fillPct","rag"];
+const STR_COLS = ["branch","zone","state","region","cluster","dbm","rag"];
+const ZONE_ORD = ["South","West 1 (MH/MP/CG)","West 2 (GJ)","North"];
+
+const $  = s=>document.querySelector(s);
+const $$ = s=>[...document.querySelectorAll(s)];
+const nr = v=>{const x=parseFloat(String(v??"").replace(/[,₹%\s]/g,""));return isNaN(x)?null:x;};
+const f0 = v=>v==null?"–":Math.round(v).toLocaleString("en-IN");
+const f1 = v=>v==null?"–":v.toLocaleString("en-IN",{minimumFractionDigits:1,maximumFractionDigits:1});
+const norm= s=>String(s??"").toLowerCase().replace(/\s+/g," ").trim();
+const sum  =(list,f)=>list.reduce((a,d)=>a+(d[f]??0),0);
+const avg  =(list,f)=>{const v=list.map(d=>d[f]).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
+const uniq =(list,f)=>[...new Set(list.map(d=>d[f]).filter(Boolean))].sort();
+const zones=list=>{const s=uniq(list,"zone");s.sort((a,b)=>{const ia=ZONE_ORD.indexOf(a),ib=ZONE_ORD.indexOf(b);return(ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);});return s;};
+
+function calcRag(gap){
+  if(gap==null) return "RED";
+  if(gap<=2) return "GREEN";
+  if(gap<=5) return "AMBER";
+  return "RED";
+}
+function ragBadge(r){return `<span class="badge b${r[0]}">${r}</span>`;}
+function ragCls(r){return r==="GREEN"?"cG":r==="AMBER"?"cA":"cR";}
+
+let DATA=[], SORT={col:null,asc:true}, COL$={};
+
+function parseCSV(txt){
+  const rows=[];let row=[],cell="",q=false;
+  for(let i=0;i<txt.length;i++){
+    const c=txt[i];
+    if(q){if(c==='"'){if(txt[i+1]==='"'){cell+='"';i++;}else q=false;}else cell+=c;}
+    else{if(c==='"')q=true;else if(c===','){row.push(cell.trim());cell="";}
+      else if(c==='\n'){row.push(cell.trim());if(row.some(x=>x))rows.push(row);row=[];cell="";}
+      else if(c!=='\r')cell+=c;}
+  }
+  if(cell||row.length){row.push(cell.trim());if(row.some(x=>x))rows.push(row);}
+  return rows;
+}
+
+function findHeaderRow(rows){
+  for(let i=0;i<Math.min(5,rows.length);i++){
+    if(rows[i].some(c=>/(branch|zone|budget|fos)/i.test(c)))return i;
+  }
+  return 0;
+}
+
+function buildIdx(hdr){
+  const hn=hdr.map(norm);const idx={};
+  for(const key in COLS){for(const alias of COLS[key]){
+    const p=hn.findIndex(h=>h===norm(alias)||h.includes(norm(alias)));
+    if(p>-1){idx[key]=p;break;}
+  }}
+  return idx;
+}
+
+function makeRow(vals, idx){
+  const g=(k)=>idx[k]!=null?(vals[idx[k]]??"").toString().trim():"";
+  const budget=nr(g("budgetFOS")) ?? 0;
+  const active=nr(g("activeFOS")) ?? 0;
+  let gap=nr(g("gap"));
+  if(gap==null) gap = Math.max(0, budget - active);
+  
+  const fillPct = budget>0 ? (active/budget*100) : 100;
+  
+  return {
+    branch:g("branch"),zone:g("zone"),state:g("state"),region:g("region"),
+    cluster:g("cluster"),dbm:g("dbm"),
+    budgetFOS:budget, activeFOS:active, gap:gap, fillPct:fillPct,
+    rag:calcRag(gap)
+  };
+}
+
+function csvToData(rows){
+  if(!rows.length)return null;
+  const hi=findHeaderRow(rows);
+  const idx=buildIdx(rows[hi]);
+  if(idx.branch==null)return null;
+  const out=[];
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i];
+    const branch=(r[idx.branch??0]??"").toString().trim();
+    if(!branch||/^\s*(total|grand|filter)\s*$/i.test(branch))continue;
+    out.push(makeRow(r,idx));
+  }
+  return out;
+}
+
+function buildFilters(){
+  [["fZone","zone","All zones"],["fRegion","region","All regions"],["fState","state","All states"],
+   ["fCluster","cluster","All clusters"]
+  ].forEach(([id,field,ph])=>{
+    const sel=$(("#"+id));const cur=sel.value;
+    sel.innerHTML=`<option value="">${ph}</option>`;
+    uniq(DATA,field).forEach(v=>{const o=document.createElement("option");o.value=o.textContent=v;sel.appendChild(o);});
+    if([...sel.options].some(o=>o.value===cur))sel.value=cur;
+  });
+}
+
+function filteredData(){
+  const q=$("#q").value.trim().toLowerCase();
+  const fz=$("#fZone").value,fr=$("#fRegion").value,fs=$("#fState").value,fc=$("#fCluster").value,frag=$("#fRag").value;
+  return DATA.filter(d=>
+    (!q||[d.branch,d.zone,d.state,d.region,d.cluster,d.dbm].some(v=>(v||"").toLowerCase().includes(q)))&&
+    (!fz||d.zone===fz)&&(!fr||d.region===fr)&&(!fs||d.state===fs)&&(!fc||d.cluster===fc)&&
+    (!frag||d.rag===frag)
+  );
+}
+
+function renderKPIs(){
+  const totBud=sum(DATA,"budgetFOS");
+  const totAct=sum(DATA,"activeFOS");
+  const totGap=sum(DATA,"gap");
+  const fillRate = totBud>0 ? (totAct/totBud*100).toFixed(1) : 0;
+  
+  const cards=[
+    {l:"Budgeted FOS", v:f0(totBud),       s:"Total Sanctioned",  c:"kb"},
+    {l:"Active FOS",   v:f0(totAct),       s:"Currently Onboarded", c:"kg"},
+    {l:"Total Gap",    v:f0(totGap),       s:"Open Positions",    c:"kr"},
+    {l:"Fill Rate",    v:fillRate+"%",     s:"Pantry Efficiency", c:"ko"},
+  ];
+  $("#kpis").innerHTML=cards.map(c=>`<div class="kpi ${c.c}"><div class="klbl">${c.l}</div><div class="kval">${c.v}</div><div class="ksub">${c.s}</div></div>`).join("");
+}
+
+let charts={};
+function renderCharts(){
+  const zs=zones(DATA);
+  const tc={color:"#6b7280",font:{family:"Calibri,Segoe UI,sans-serif",size:11}};
+  const grid={color:"#eef0f3"};
+  Object.values(charts).forEach(c=>c?.destroy());
+
+  // Chart 1: Overall Budget vs Filled vs Gap
+  charts.bvg=new Chart($("#cBvg"),{type:"bar",
+    data:{labels:["All Branches"],datasets:[
+      {label:"Budget",data:[sum(DATA,"budgetFOS")],backgroundColor:"#1a73e8",borderRadius:4,maxBarThickness:50},
+      {label:"Active",data:[sum(DATA,"activeFOS")],backgroundColor:"#16803c",borderRadius:4,maxBarThickness:50},
+      {label:"Gap",data:[sum(DATA,"gap")],backgroundColor:"#dc2626",borderRadius:4,maxBarThickness:50}
+    ]},
+    options:{maintainAspectRatio:false,plugins:{legend:{position:"top",labels:{font:{family:"Calibri,Segoe UI",size:11}}}},scales:{x:{grid:{display:false}},y:{grid,ticks:tc,beginAtZero:true}}}});
+
+  // Chart 2: Zone Gap
+  charts.zoneGap=new Chart($("#cZoneGap"),{type:"bar",
+    data:{labels:zs,datasets:[{data:zs.map(z=>sum(DATA.filter(d=>d.zone===z),"gap")),backgroundColor:"#FF1616",borderRadius:4,maxBarThickness:38}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:tc},y:{grid,ticks:tc,beginAtZero:true}}}});
+
+  // Chart 3: Status Mix Donut
+  const G=DATA.filter(d=>d.rag==="GREEN").length;
+  const A=DATA.filter(d=>d.rag==="AMBER").length;
+  const R=DATA.filter(d=>d.rag==="RED").length;
+  charts.mix=new Chart($("#cStatusMix"),{type:"doughnut",
+    data:{labels:["Green (Gap≤2)","Amber (Gap 3-5)","Red (Gap>5)"],datasets:[{data:[G,A,R],backgroundColor:["#16803c","#d97706","#dc2626"],borderColor:"#fff",borderWidth:2}]},
+    options:{cutout:"62%",maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{color:"#1a1a1c",font:{family:"Calibri,Segoe UI",size:11},boxWidth:9,padding:8}}}}});
+
+  // Chart 4: Top 10 Branches with Highest Gap
+  const top10=[...DATA].filter(d=>d.gap>0).sort((a,b)=>(b.gap||0)-(a.gap||0)).slice(0,10);
+  charts.topGap=new Chart($("#cTopGap"),{type:"bar",
+    data:{labels:top10.map(d=>d.branch),datasets:[{data:top10.map(d=>d.gap),backgroundColor:"#dc2626",borderRadius:4}]},
+    options:{indexAxis:"y",maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid,ticks:tc,beginAtZero:true},y:{grid:{display:false},ticks:{...tc,font:{size:10}}}}}});
+
+  // Chart 5: Cluster-wise Fill %
+  const clusters=uniq(DATA,"cluster").filter(Boolean);
+  charts.clusterPct=new Chart($("#cClusterPct"),{type:"bar",
+    data:{labels:clusters,datasets:[{label:"Fill %",data:clusters.map(c=>avg(DATA.filter(d=>d.cluster===c),"fillPct")),backgroundColor:"#7c3aed",borderRadius:4,maxBarThickness:18}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{...tc,font:{size:9}}},y:{grid,ticks:{...tc,callback:v=>v+"%"},beginAtZero:true,max:100}}}});
+}
+
+function cellVal(d,col){
+  switch(col){
+    case "budgetFOS": return f0(d.budgetFOS);
+    case "activeFOS": return f0(d.activeFOS);
+    case "gap":       return f0(d.gap);
+    case "fillPct":   return f1(d.fillPct);
+    case "rag":       return ragBadge(d.rag);
+    default: return d[col]??"";
+  }
+}
+function cellCls(d,col){ return col==="gap"?ragCls(d.rag):""; }
+function aggVal(list,col){
+  if(STR_COLS.includes(col)) return "";
+  switch(col){
+    case "budgetFOS": return f0(sum(list,"budgetFOS"));
+    case "activeFOS": return f0(sum(list,"activeFOS"));
+    case "gap":       return f0(sum(list,"gap"));
+    case "fillPct":   return f1(avg(list,"fillPct"));
+    default: return "";
+  }
+}
+
+function renderTable(){
+  let list=filteredData();
+  if(SORT.col){
+    const sk=SORT.col;
+    list=[...list].sort((a,b)=>{
+      let av=a[sk]??"",bv=b[sk]??"";
+      if(typeof av!=="string"||typeof bv!=="string"){av=av??-Infinity;bv=bv??-Infinity;}
+      return SORT.asc?(av>bv?1:av<bv?-1:0):(av<bv?1:av>bv?-1:0);
+    });
+  }
+
+  $$("thead th[data-col]").forEach(th=>{
+    th.classList.remove("sa","sd");
+    if(SORT.col===th.dataset.col) th.classList.add(SORT.asc?"sa":"sd");
+    th.onclick=()=>{
+      const c=th.dataset.col;
+      SORT.col===c?SORT.asc=!SORT.asc:(SORT.col=c,SORT.asc=true);
+      renderTable();
+    };
+  });
+
+  const tbody=$("#tb"); tbody.innerHTML="";
+  const zs=zones(list);
+
+  zs.forEach(z=>{
+    const rows=list.filter(d=>d.zone===z);
+    const G=rows.filter(d=>d.rag==="GREEN").length;
+    const A=rows.filter(d=>d.rag==="AMBER").length;
+    const R=rows.filter(d=>d.rag==="RED").length;
+    const T=G+A+R||1;
+    const isCol=!!COL$[z];
+
+    const zr=document.createElement("tr"); zr.className="zr"+(isCol?" col":""); zr.dataset.z=z;
+    zr.innerHTML=`<td class="l" colspan="${ALL_COLS.length}"><div class="zh">
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      <span class="zn">${z}</span><span class="zbr">${rows.length} branches</span>
+      <span class="rib"><span class="rg" style="width:${100*G/T}%"></span><span class="ra" style="width:${100*A/T}%"></span><span class="rr" style="width:${100*R/T}%"></span></span>
+      <span class="zmix"><b>${G}</b> G · <b>${A}</b> A · <b>${R}</b> R</span>
+    </div></td>`;
+    zr.addEventListener("click",()=>{COL$[z]=!COL$[z];renderTable();});
+    tbody.appendChild(zr);
+
+    if(!isCol){
+      rows.forEach(d=>{
+        const tr=document.createElement("tr");
+        tr.innerHTML=ALL_COLS.map((c,i)=>{
+          const grp=["budgetFOS","rag"].includes(c)?" grp-sep":"";
+          const isL=STR_COLS.includes(c)&&c!=="rag";
+          return `<td class="${isL?"l":""}${grp} ${cellCls(d,c)}">${cellVal(d,c)}</td>`;
+        }).join("");
+        tbody.appendChild(tr);
+      });
+      const zt=document.createElement("tr"); zt.className="zt";
+      zt.innerHTML=ALL_COLS.map((c,i)=>{
+        if(i===0) return `<td class="l">${z} — Total (${rows.length})</td>`;
+        const grp=["budgetFOS","rag"].includes(c)?" grp-sep":"";
+        return `<td class="${grp}">${aggVal(rows,c)}</td>`;
+      }).join("");
+      tbody.appendChild(zt);
+    }
+  });
+
+  if(!zs.length){
+    tbody.innerHTML=`<tr><td colspan="${ALL_COLS.length}" class="empty">No branches match the current filters.</td></tr>`;
+  } else {
+    const gr=document.createElement("tr"); gr.className="grand";
+    gr.innerHTML=ALL_COLS.map((c,i)=>{
+      if(i===0) return `<td class="l">Grand Total — ${zs.length} zone${zs.length>1?"s":""} · ${list.length} branches</td>`;
+      return `<td>${aggVal(list,c)}</td>`;
+    }).join("");
+    tbody.appendChild(gr);
+  }
+  $("#cnt").textContent=`${list.length} of ${DATA.length} branches`;
+}
+
+function setSB(kind,html){const sb=$("#sb");sb.className="status-bar sb-"+kind;$("#sbtxt").innerHTML=html;}
+function stamp(){$("#asof").textContent=new Date().toLocaleString("en-IN",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});}
+
+function boot(list,src){
+  DATA=list; COL$={}; stamp();
+  buildFilters(); renderKPIs(); renderCharts(); renderTable();
+  setSB("live", `✓ Live Data · <b>${DATA.length} branches</b> · Source: Google Sheets (Recruitment Data)`);
+}
+
+async function loadViaCSV(){
+  setSB("load","Fetching from published Google Sheet…");
+  const res=await fetch(CSV_URL,{cache:"no-store"});
+  if(!res.ok) throw new Error("HTTP "+res.status);
+  const txt=await res.text();
+  if(txt.trim().startsWith("<!")) throw new Error("Sheet returned HTML — check publish settings");
+  const rows=parseCSV(txt);
+  const objs=csvToData(rows);
+  if(!objs||!objs.length) throw new Error("No branch rows found");
+  return objs;
+}
+
+async function load(){
+  $("#btnRef").disabled=true;
+  $("#overlay").classList.remove("hidden");
+  try{
+    const objs=await loadViaCSV();
+    boot(objs,"csv");
+  }catch(e){
+    setSB("err",`⚠ ${e.message}`);
+  }finally{
+    $("#btnRef").disabled=false;
+    $("#overlay").classList.add("hidden");
+  }
+}
+
+["q","fZone","fRegion","fState","fCluster","fRag"].forEach(id=>{
+  $(("#"+id)).addEventListener("input",renderTable);
+});
+ $("#btnRef").addEventListener("click",load);
+
+load();
+</script>
+</body>
+</html>
